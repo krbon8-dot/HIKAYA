@@ -1,0 +1,177 @@
+export type BlockType = 'text' | 'image' | 'dialogue';
+
+export interface BaseBlock {
+  id: string;
+  type: BlockType;
+}
+
+export interface TextBlock extends BaseBlock {
+  type: 'text';
+  content: string; // Will support basic HTML/markdown tags like <b>, <i>, <span color="...">
+  style: 'normal' | 'h1' | 'h2' | 'quote';
+  align: 'right' | 'center' | 'left';
+  color?: string;
+  fontFamily?: string;
+}
+
+export interface ImageData {
+  id: string;
+  url: string;
+  width?: number; // In pixels
+  height?: number; // In pixels
+}
+
+export interface ImageBlock extends BaseBlock {
+  type: 'image';
+  images: ImageData[];
+  align: 'right' | 'center' | 'left';
+  borderRadius?: number;
+  gap?: number;
+}
+
+
+export interface DialogueBlock extends BaseBlock {
+  type: 'dialogue';
+  text: string;
+  avatarUrl: string;
+  avatarSize?: number; // Size in pixels, undefined means default
+  direction: 'rtl' | 'ltr'; // 'rtl' means avatar is on the right, speech points from right to left
+  bubbleType: 'speech' | 'thought' | 'shout' | 'whisper' | 'electronic' | 'scared' | 'narrator' | 'system';
+  bubbleColor?: string;
+  fontFamily?: string;
+  bubbleWidth?: number | 'auto';
+  bubbleHeight?: number | 'auto';
+}
+
+export type StoryBlock = TextBlock | ImageBlock | DialogueBlock;
+
+export interface Chapter {
+  id: string;
+  title: string;
+}
+
+export interface ProjectPage {
+  id: string;
+  name: string;
+  blocks: StoryBlock[];
+  chapterId?: string; // Phase: organization
+  backgroundImage?: string; // Phase: visuals #15
+  backgroundOpacity?: number;
+  isCover?: boolean;
+  subplots?: string[]; // IDs of subplots this page belongs to
+}
+
+export interface Character {
+  id: string;
+  name: string;
+  avatarUrl: string;
+  details: string;
+  backstory?: string;
+  inventory?: string[];
+  goal?: string;
+  factionIds?: string[];
+  healthStatus?: string;
+}
+
+export interface Faction {
+  id: string;
+  name: string;
+  type: string; // 'مملكة' | 'نقابة' | 'فريق' | 'أخرى'
+  emblemUrl?: string;
+  leaderId?: string;
+  memberIds?: string[];
+  description?: string;
+}
+
+export interface WorldMapNode {
+  id: string;
+  name: string;
+  type: 'kingdom' | 'city' | 'village';
+  parentId?: string; // which city or kingdom it belongs to
+  leader?: string;
+  description?: string;
+  borders?: string;
+  // Enhanced Location Profile Fields
+  imageUrl?: string;
+  climate?: string;
+  economy?: string;
+  risks?: string;
+  guilds?: string;
+}
+
+// Worldbuilding Types
+export interface Lore {
+  id: string;
+  title: string;
+  content: string;
+  type?: 'general' | 'law' | 'currency' | 'secret' | 'economy';
+}
+
+export interface Relation {
+  id: string;
+  char1Id: string;
+  char2Id: string;
+  type: string; // e.g., 'enemies', 'friends', 'brother', 'father'
+}
+
+export interface PlanningItem {
+  id: string;
+  name: string;
+  description: string;
+  type: 'artifact' | 'power';
+}
+
+export interface KanbanCard {
+  id: string;
+  title: string;
+  desc: string;
+  status: 'todo' | 'doing' | 'done';
+}
+
+export interface Subplot {
+  id: string;
+  name: string;
+  color: string;
+}
+
+export interface Location {
+  id: string;
+  name: string;
+  imageUrl?: string;
+  description?: string;
+  climate?: string;
+  ruler?: string;
+  economy?: string;
+  risks?: string;
+  guilds?: string;
+}
+
+export interface AISettings {
+  apiKey: string;
+  modelType: 'flash' | 'pro';
+  modelName: string;
+}
+
+export interface ProjectData {
+  id: string;
+  name: string;
+  backgroundColor: string;
+  pageWidth?: number;
+  pagePadding?: number;
+  blockGap?: number;
+  pages: ProjectPage[];
+  characters: Character[];
+  scenario: string;
+  alternativeScenarios?: string[];
+  
+  // New Arrays for Worldbuilding & Organization
+  chapters?: Chapter[];
+  lore?: Lore[];
+  worldMap?: WorldMapNode[];
+  factions?: Faction[];
+  relations?: Relation[];
+  kanban?: KanbanCard[];
+  planningItems?: PlanningItem[];
+  subplots?: Subplot[];
+  locations?: Location[];
+}

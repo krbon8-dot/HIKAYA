@@ -1,0 +1,82 @@
+@import url('https://fonts.googleapis.com/css2?family=Amiri:ital,wght@0,400;0,700;1,400&family=Cairo:wght@400;500;600;700&family=Tajawal:wght@400;500;700&family=Changa:wght@400;600&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Cairo", "Tajawal", "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+  --font-serif: "Amiri", 'Georgia', 'Times New Roman', serif;
+  --font-display: "Changa", sans-serif;
+}
+
+:root {
+  --bg: #0a0a0a;
+  --panel: #161616;
+  --border: #2a2a2a;
+  --accent: #a855f7;
+  --text: #e5e7eb;
+  --text-dim: #9ca3af;
+}
+
+@layer base {
+  body {
+    background-color: var(--bg);
+    color: var(--text);
+    font-family: var(--font-sans);
+  }
+}
+
+/* Print styles to hide UI when exporting to PDF and ensure full content is printed */
+@media print {
+  @page {
+    size: auto;
+    margin: 0;
+  }
+  
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    color-adjust: exact !important;
+  }
+
+  html, body, #root, section, main, div.flex-1 {
+    height: auto !important;
+    min-height: auto !important;
+    overflow: visible !important;
+    display: block !important;
+    background-color: transparent !important;
+  }
+
+  body {
+    background-color: white !important;
+  }
+  
+  .no-print {
+    display: none !important;
+  }
+  
+  .print-only-container {
+    display: block !important;
+    background-color: transparent !important;
+  }
+  
+  .break-after-page {
+    page-break-after: always;
+    break-after: page;
+  }
+  
+  .story-container {
+    box-shadow: none !important;
+    max-width: 100% !important;
+    width: 100% !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  .print-area {
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+  
+  .page-break-inside-avoid {
+    page-break-inside: avoid;
+  }
+}
