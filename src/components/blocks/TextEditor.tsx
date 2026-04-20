@@ -246,7 +246,9 @@ export default function TextEditor({ block, project, onChange, onClick }: Props)
             style={{ 
               direction: block.align === 'left' ? 'ltr' : 'rtl',
               color: block.color || 'var(--text)',
-              fontFamily: block.fontFamily ? `var(--font-${block.fontFamily})` : undefined
+              fontFamily: block.fontFamily ? `var(--font-${block.fontFamily})` : undefined,
+              fontSize: block.fontSize ? `${block.fontSize}px` : undefined,
+              lineHeight: block.fontSize ? '1.5' : undefined
             }}
           />
 

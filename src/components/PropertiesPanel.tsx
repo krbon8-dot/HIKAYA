@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { StoryBlock, TextBlock, ImageBlock, DialogueBlock, ProjectData, Character, Lore, Relation, KanbanCard, Chapter, Faction, PlanningItem, WorldMapNode } from '../types';
-import { Sparkles, ImagePlus, UserCircle2, Loader2, Palette, Users, FileText, Settings, Plus, Trash2, BookOpen, Link, KanbanSquare, HeartPulse, X, Globe, Shield, Target, Briefcase, Zap } from 'lucide-react';
+import { Sparkles, ImagePlus, UserCircle2, Loader2, Palette, Users, FileText, Settings, Plus, Trash2, BookOpen, Link, KanbanSquare, HeartPulse, X, Globe, Shield, Target, Briefcase, Zap, BookA } from 'lucide-react';
 import { fileToDataUrl, generateId, cn } from '../lib/utils';
 import { generateSuggestion } from '../lib/aiService';
 
@@ -25,6 +25,7 @@ export default function PropertiesPanel({ block, onChange, project, updateProjec
   const [selectedLoreId, setSelectedLoreId] = useState<string | null>(null);
   const [selectedFactionId, setSelectedFactionId] = useState<string | null>(null);
   const [selectedMapNodeId, setSelectedMapNodeId] = useState<string | null>(null);
+  const [optionsModal, setOptionsModal] = useState<{ isOpen: boolean, options: string[], onSelect: (index: number) => void } | null>(null);
 
   const activePage = project.pages.find(p => p.id === activePageId);
 
@@ -136,6 +137,21 @@ export default function PropertiesPanel({ block, onChange, project, updateProjec
           className="w-full h-10 rounded cursor-pointer bg-transparent border-0 p-0"
         />
       </div>
+      <div className="flex flex-col gap-2 mt-2">
+        <label className="text-[0.8rem] text-[var(--text)] flex justify-between">
+           <span>حجم الخط المخصص</span>
+           <span className="text-[var(--text-dim)]">{b.fontSize ? `${b.fontSize}px` : 'تلقائي'}</span>
+        </label>
+        <div className="flex items-center gap-2">
+           <input 
+             type="range" min="10" max="100" 
+             value={b.fontSize || 0} 
+             onChange={e => update({ fontSize: Number(e.target.value) || undefined })}
+             className="accent-[var(--accent)] flex-1"
+           />
+           {b.fontSize && <button onClick={() => update({ fontSize: undefined })} className="text-[10px] text-red-400 hover:text-red-500">إلغاء</button>}
+        </div>
+      </div>
 
       <div className="flex flex-col gap-2 mt-2">
         <button 
@@ -148,7 +164,7 @@ export default function PropertiesPanel({ block, onChange, project, updateProjec
         </button>
         <div className="flex gap-2">
           <button 
-            onClick={() => handleAI(`قم بتصحيح الأخطاء الإملائية والنحوية وتنسيق هذا النص ليصبح أدبياً: ${b.content}`, 'narrative', (text) => update({ content: text }))}
+            onClick={() => handleAI(b.content, 'proofread', (text) => update({ content: text }))}
             disabled={isGenerating}
             className="flex-1 bg-[var(--bg)] border border-green-500/50 text-green-500 py-2 rounded text-xs hover:bg-green-500/10 transition-colors flex items-center justify-center gap-1 disabled:opacity-50"
           >
@@ -162,6 +178,40 @@ export default function PropertiesPanel({ block, onChange, project, updateProjec
             <Sparkles size={12} /> توسيع
           </button>
         </div>
+        <button 
+           onClick={async () => {
+              setIsGenerating(true);
+              try {
+                const { generateSuggestion } = await import('../lib/aiService');
+                const rawOptions = await generateSuggestion(b.content, 'options', project);
+                if (rawOptions) {
+                  try {
+                    const parsed = JSON.parse(rawOptions.replace(/```json/g, '').replace(/```/g, '').trim());
+                    if (Array.isArray(parsed) && parsed.length >= 2) {
+                       setOptionsModal({
+                         isOpen: true,
+                         options: parsed,
+                         onSelect: (index: number) => {
+                           update({ content: b.content + '\n\n' + parsed[index] });
+                           setOptionsModal(null);
+                         }
+                       });
+                    } else {
+                       alert("الخيارات المستلمة:\n" + rawOptions);
+                    }
+                  } catch(e) {
+                    alert("الخيارات المقترحة:\n\n" + rawOptions);
+                  }
+                }
+              } finally {
+                setIsGenerating(false);
+              }
+           }}
+           disabled={isGenerating}
+           className="w-full bg-[var(--bg)] border border-yellow-500/50 text-yellow-500 py-2 mt-2 rounded text-xs hover:bg-yellow-500/10 transition-colors flex items-center justify-center gap-1 disabled:opacity-50"
+        >
+          <Sparkles size={12} /> اقترح خيارات للأحداث القادمة
+        </button>
       </div>
     </>
   );
@@ -294,6 +344,181 @@ export default function PropertiesPanel({ block, onChange, project, updateProjec
         >
           <HeartPulse size={16} /> تحليل المشاعر (تلوين ذكي)
         </button>
+
+        <button 
+           onClick={async () => {
+              setIsGenerating(true);
+              try {
+                const { generateSuggestion } = await import('../lib/aiService');
+                const charMatch = project.characters?.find(c => c.avatarUrl === b.avatarUrl);
+                let contextText = b.text;
+                if (charMatch && charMatch.details) {
+                  contextText = `المتحدث ${charMatch.name} (${charMatch.details}): ${b.text}`;
+                }
+                const rawOptions = await generateSuggestion(contextText, 'options', project);
+                if (rawOptions) {
+                  try {
+                    const parsed = JSON.parse(rawOptions.replace(/```json/g, '').replace(/```/g, '').trim());
+                    if (Array.isArray(parsed) && parsed.length >= 2) {
+                       setOptionsModal({
+                         isOpen: true,
+                         options: parsed,
+                         onSelect: (index: number) => {
+                           update({ text: b.text + '\n\n' + parsed[index] });
+                           setOptionsModal(null);
+                         }
+                       });
+                    } else {
+                       alert("الخيارات المستلمة:\n" + rawOptions);
+                    }
+                  } catch(e) {
+                    alert("الخيارات المقترحة:\n\n" + rawOptions);
+                  }
+                }
+              } finally {
+                setIsGenerating(false);
+              }
+           }}
+           disabled={isGenerating}
+           className="w-full bg-[var(--bg)] border border-yellow-500/50 text-yellow-500 py-2 mt-0 rounded text-xs hover:bg-yellow-500/10 transition-colors flex items-center justify-center gap-1 disabled:opacity-50"
+        >
+          <Sparkles size={12} /> اقترح خيارات استجابة
+        </button>
+      </div>
+    </>
+  );
+
+  const renderCalloutProps = (b: any) => (
+    <>
+      <div className="flex flex-col gap-2">
+        <label className="text-[0.8rem] text-[var(--text)]">نوع المربع</label>
+        <select 
+          className="bg-[var(--bg)] border border-[var(--border)] text-[var(--text)] p-2 rounded text-[0.85rem]"
+          value={b.calloutType} 
+          onChange={e => update({ calloutType: e.target.value })}
+        >
+          <option value="note">ملاحظة عادية (أصفر)</option>
+          <option value="flashback">فلاش باك / ماضي (رمادي)</option>
+          <option value="warning">تحذير / خطورة (أحمر)</option>
+          <option value="info">معلومة / اكتشاف (أزرق)</option>
+          <option value="quote">اقتباس (ذهبي/بني)</option>
+        </select>
+      </div>
+      <div className="flex flex-col gap-2 mt-2">
+        <label className="text-[0.8rem] text-[var(--text)]">تخصيص لون الخلفية</label>
+        <input 
+          type="color" 
+          value={b.backgroundColor || '#ffffff'} 
+          onChange={e => update({ backgroundColor: e.target.value })}
+          className="w-full h-10 rounded cursor-pointer bg-transparent border-[var(--border)] p-1"
+        />
+        <button onClick={() => update({ backgroundColor: undefined, textColor: undefined })} className="text-xs text-[var(--text-dim)] hover:text-white mt-1">إعادة تعيين للألوان الافتراضية</button>
+      </div>
+    </>
+  );
+
+  const renderTableProps = (b: any) => (
+    <>
+      <div className="flex flex-col gap-2">
+        <label className="text-[0.8rem] text-[var(--text)]">عدد الأعمدة</label>
+        <div className="flex border border-[var(--border)] rounded overflow-hidden">
+           {[1, 2, 3, 4].map((colCount) => (
+             <button 
+               key={colCount}
+               onClick={() => {
+                 if (b.columns === colCount) return;
+                 const newRows = b.rows.map((r: any) => {
+                   const newRow = [];
+                   for(let i = 0; i < colCount; i++) newRow.push(r[i] || '');
+                   return newRow;
+                 });
+                 update({ columns: colCount, rows: newRows });
+               }} 
+               className={`flex-1 py-1.5 text-sm transition-colors border-l last:border-l-0 border-[var(--border)] ${b.columns === colCount ? 'bg-[var(--accent)] text-white' : 'bg-[var(--bg)] hover:bg-[var(--border)]'}`}
+             >
+               {colCount}
+             </button>
+           ))}
+        </div>
+      </div>
+      <div className="flex flex-col gap-2 mt-2">
+        <label className="text-[0.8rem] text-[var(--text)]">تعبئة ذكية بالذكاء الاصطناعي</label>
+        <button 
+           onClick={async () => {
+              const command = window.prompt("ما هي البيانات التي تريد ملء الجدول بها بناءً على القصة؟ (مثال: إحصائيات بطل القصة، تسلسل زمني للحروب...)");
+              if (!command) return;
+              setIsGenerating(true);
+              try {
+                const { generateSuggestion } = await import('../lib/aiService');
+                const context = `نريد إنشاء جدول يحتوي على ${b.columns} أعمدة. المطلوب هو:\n${command}\n\nالإرجاع يجب أن يكون بصيغة JSON Array of Arrays (مصفوفة ثنائية الأبعاد فقط) حيث كل مصفوفة داخلية تمثل صفاً واحداً ولا يجب إرجاع أي نص إضافي.`;
+                const result = await generateSuggestion(context, 'options', project);
+                if (result) {
+                   try {
+                     const parsedRows = JSON.parse(result);
+                     if (Array.isArray(parsedRows) && Array.isArray(parsedRows[0])) {
+                        // Normalize columns width to match current table
+                        const normalizedRows = parsedRows.map((r: any[]) => {
+                           const row = [];
+                           for(let i=0; i<b.columns; i++) row.push(r[i] ? String(r[i]) : '');
+                           return row;
+                        });
+                        update({ rows: normalizedRows });
+                     } else {
+                        alert('رد الذكاء الاصطناعي لم يكن بالتنسيق المطلوب (مصفوفة).');
+                     }
+                   } catch(e) {
+                      alert('تعذر قراءة بيانات الجدول من المولد (JSON Error).');
+                   }
+                }
+              } finally {
+                setIsGenerating(false);
+              }
+           }}
+           disabled={isGenerating}
+           className="w-full bg-[var(--bg)] border border-blue-500/50 text-blue-500 py-2 rounded text-xs hover:bg-blue-500/10 transition-colors flex items-center justify-center gap-2 disabled:opacity-50 font-bold"
+        >
+           <Sparkles size={14} /> إنشاء محتوى للجدول (AI)
+        </button>
+      </div>
+      <div className="flex flex-col gap-2 mt-2">
+        <p className="text-[0.7rem] text-[var(--text-dim)] border-t border-[var(--border)] pt-2 mt-2">يمكنك الكتابة داخل خلايا الجدول مباشرة من الواجهة الرئيسية.</p>
+      </div>
+    </>
+  );
+
+  const renderDividerProps = (b: any) => (
+    <>
+      <div className="flex flex-col gap-2">
+        <label className="text-[0.8rem] text-[var(--text)]">نوع وشكل الخط الفاصل</label>
+        <select 
+          className="bg-[var(--bg)] border border-[var(--border)] text-[var(--text)] p-2 rounded text-[0.85rem]"
+          value={b.style} 
+          onChange={e => update({ style: e.target.value })}
+        >
+          <option value="solid">مستمر (صلب)</option>
+          <option value="dashed">متقطع (Dashed)</option>
+          <option value="dotted">منقط (Dotted)</option>
+          <option value="double">مزدوج (Double)</option>
+          <option value="wavy">مموج (Wavy)</option>
+        </select>
+      </div>
+      <div className="flex flex-col gap-2 mt-2">
+        <label className="text-[0.8rem] text-[var(--text)]">لون الخط</label>
+        <input 
+          type="color" 
+          value={b.color || '#cccccc'} 
+          onChange={e => update({ color: e.target.value })}
+          className="w-full h-10 rounded cursor-pointer bg-transparent border-0 p-0"
+        />
+      </div>
+      <div className="flex flex-col gap-2 mt-2">
+         <label className="text-[0.8rem] text-[var(--text)]">سُمك الخط (Thickness)</label>
+         <input 
+           type="range" min="1" max="10" 
+           value={b.thickness ?? 2} 
+           onChange={e => update({ thickness: Number(e.target.value) })}
+           className="accent-[var(--accent)]"
+         />
       </div>
     </>
   );
@@ -445,22 +670,38 @@ export default function PropertiesPanel({ block, onChange, project, updateProjec
         </div>
 
         {!selectedCharId ? (
-          <div className="flex flex-col gap-2">
+          <div className="flex flex-col gap-4">
             {chars.length === 0 ? (
               <p className="text-xs text-[var(--text-dim)] text-center py-4">لم تقم بإضافة أي شخصيات بعد.</p>
             ) : (
-              chars.map(char => (
-                <div 
-                  key={char.id} 
-                  onClick={() => setSelectedCharId(char.id)}
-                  className="flex items-center gap-3 p-2 border border-[var(--border)] rounded cursor-pointer hover:border-[var(--accent)] transition-colors bg-[var(--bg)]"
-                >
-                  <div className="w-10 h-10 rounded bg-slate-200 overflow-hidden flex-shrink-0">
-                     {char.avatarUrl ? <img src={char.avatarUrl} referrerPolicy="no-referrer" className="w-full h-full object-cover"/> : <UserCircle2 className="w-full h-full p-2 text-slate-400" />}
+              (['main', 'secondary', 'unappeared', 'dead', 'none'] as const).map(roleGroup => {
+                const groupChars = chars.filter(c => roleGroup === 'none' ? !c.role : c.role === roleGroup);
+                if (groupChars.length === 0) return null;
+                
+                const groupTitle = 
+                  roleGroup === 'main' ? 'شخصيات رئيسية' :
+                  roleGroup === 'secondary' ? 'شخصيات ثانوية' :
+                  roleGroup === 'unappeared' ? 'لم تخرج في القصة بعد' :
+                  roleGroup === 'dead' ? 'شخصيات ميتة' : 'غير مصنف';
+
+                return (
+                  <div key={roleGroup} className="flex flex-col gap-2">
+                    <h4 className="text-[10px] text-[var(--accent)] font-bold mb-1 border-b border-[var(--border)] pb-1">{groupTitle}</h4>
+                    {groupChars.map(char => (
+                      <div 
+                        key={char.id} 
+                        onClick={() => setSelectedCharId(char.id)}
+                        className="flex items-center gap-3 p-2 border border-[var(--border)] rounded cursor-pointer hover:border-[var(--accent)] transition-colors bg-[var(--bg)]"
+                      >
+                        <div className="w-10 h-10 rounded bg-slate-200 overflow-hidden flex-shrink-0">
+                           {char.avatarUrl ? <img src={char.avatarUrl} referrerPolicy="no-referrer" className="w-full h-full object-cover"/> : <UserCircle2 className="w-full h-full p-2 text-slate-400" />}
+                        </div>
+                        <span className="text-sm font-bold flex-1 truncate">{char.name}</span>
+                      </div>
+                    ))}
                   </div>
-                  <span className="text-sm font-bold flex-1 truncate">{char.name}</span>
-                </div>
-              ))
+                );
+              })
             )}
           </div>
         ) : (
@@ -472,6 +713,21 @@ export default function PropertiesPanel({ block, onChange, project, updateProjec
               >
                 &larr; رجوع للقائمة
               </button>
+
+              <div className="flex flex-col gap-2">
+                <label className="text-[0.8rem] text-[var(--text)]">الدور العضوي في القصة</label>
+                <select 
+                  value={selectedChar.role || 'none'}
+                  onChange={e => updateCharacter(selectedChar.id, { role: e.target.value === 'none' ? undefined : e.target.value as any })}
+                  className="w-full bg-[var(--bg)] border border-[var(--border)] p-2 rounded text-sm text-[var(--text)] outline-none focus:border-[var(--accent)]"
+                >
+                  <option value="none">غير مصنف</option>
+                  <option value="main">شخصية رئيسية</option>
+                  <option value="secondary">شخصية ثانوية</option>
+                  <option value="unappeared">لم تخرج في القصة بعد</option>
+                  <option value="dead">شخصية ميتة</option>
+                </select>
+              </div>
 
               <div className="flex flex-col gap-2">
                 <label className="text-[0.8rem] text-[var(--text)]">صورة الشخصية</label>
@@ -1344,6 +1600,63 @@ export default function PropertiesPanel({ block, onChange, project, updateProjec
     );
   };
 
+  const renderDictionaryTab = () => {
+    const dictionary = project.dictionary || [];
+    return (
+      <div className="flex flex-col h-full gap-4 pb-20">
+        <div className="flex justify-between items-center mb-0">
+           <h3 className="text-xs uppercase tracking-wider text-[var(--accent)] font-bold flex items-center gap-2"><BookA size={14}/> قاموس اللغة المبتكرة</h3>
+           <button onClick={() => updateProject({ dictionary: [...dictionary, { id: generateId(), word: '', meaning: '', notes: '' }] })} className="p-1 hover:bg-[rgba(168,85,247,0.1)] text-[var(--accent)] rounded transition-colors"><Plus size={16}/></button>
+        </div>
+        <p className="text-[10px] text-[var(--text-dim)]">أضف كلمات من لغاتك الخيالية ليتمكن الذكاء الاصطناعي من فهمها وربطها.</p>
+
+        <div className="flex flex-col gap-3 mt-2">
+          {dictionary.length === 0 ? (
+            <p className="text-xs text-center text-[var(--text-dim)] py-4 border border-dashed border-[var(--border)] rounded">لا توجد كلمات حالياً.</p>
+          ) : (
+            dictionary.map(item => (
+              <div key={item.id} className="flex flex-col gap-2 p-3 bg-black/20 border border-[var(--border)] rounded relative group">
+                <div className="flex gap-2">
+                   <div className="flex flex-col gap-1 flex-1">
+                     <label className="text-[9px] text-[var(--text-dim)]">الكلمة المبتكرة</label>
+                     <input 
+                       value={item.word}
+                       onChange={e => updateProject({ dictionary: dictionary.map(d => d.id === item.id ? { ...d, word: e.target.value } : d) })}
+                       className="bg-transparent border-b border-[var(--border)] p-1 text-sm font-bold text-[var(--accent)] outline-none focus:border-purple-500"
+                       placeholder="مثال: Dracarys"
+                     />
+                   </div>
+                   <div className="flex flex-col gap-1 flex-1">
+                     <label className="text-[9px] text-[var(--text-dim)]">المعنى / الترجمة</label>
+                     <input 
+                       value={item.meaning}
+                       onChange={e => updateProject({ dictionary: dictionary.map(d => d.id === item.id ? { ...d, meaning: e.target.value } : d) })}
+                       className="bg-transparent border-b border-[var(--border)] p-1 text-sm font-medium text-[var(--text)] outline-none focus:border-purple-500"
+                       placeholder="مثال: نار تنين"
+                     />
+                   </div>
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-[9px] text-[var(--text-dim)]">ملاحظات حول النطق أو الاستخدام (اختياري)</label>
+                  <textarea 
+                    value={item.notes || ''}
+                    onChange={e => updateProject({ dictionary: dictionary.map(d => d.id === item.id ? { ...d, notes: e.target.value } : d) })}
+                    className="bg-[var(--bg)] border border-[var(--border)] p-1 text-xs text-[var(--text)] outline-none focus:border-purple-500 rounded min-h-[40px] resize-y"
+                    placeholder="..."
+                  />
+                </div>
+                <button 
+                  onClick={() => updateProject({ dictionary: dictionary.filter(d => d.id !== item.id) })}
+                  className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 text-red-500 hover:text-red-400 bg-[var(--bg)] rounded-full p-1"
+                ><Trash2 size={12} /></button>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="flex flex-col h-full bg-[var(--panel)]">
       <div className="flex w-full border-b border-[var(--border)] p-2 gap-1 overflow-x-auto no-scrollbar justify-center">
@@ -1353,6 +1666,7 @@ export default function PropertiesPanel({ block, onChange, project, updateProjec
          <button onClick={() => setActiveTab('world')} title="العالم" className={`p-2 rounded flex items-center justify-center gap-1 transition-colors ${activeTab==='world' ? 'bg-[var(--accent)] text-white' : 'text-[var(--text-dim)] hover:bg-[var(--bg)]'}`}><BookOpen size={18}/></button>
          <button onClick={() => setActiveTab('kanban')} title="تخطيط" className={`p-2 rounded flex items-center justify-center gap-1 transition-colors ${activeTab==='kanban' ? 'bg-[var(--accent)] text-white' : 'text-[var(--text-dim)] hover:bg-[var(--bg)]'}`}><KanbanSquare size={18}/></button>
          <button onClick={() => setActiveTab('factions')} title="النقابات/الممالك" className={`p-2 rounded flex items-center justify-center gap-1 transition-colors ${activeTab==='factions' ? 'bg-[var(--accent)] text-white' : 'text-[var(--text-dim)] hover:bg-[var(--bg)]'}`}><Shield size={18}/></button>
+         <button onClick={() => setActiveTab('dict')} title="القاموس" className={`p-2 rounded flex items-center justify-center gap-1 transition-colors ${activeTab==='dict' ? 'bg-[var(--accent)] text-white' : 'text-[var(--text-dim)] hover:bg-[var(--bg)]'}`}><BookA size={18}/></button>
       </div>
       
       <div className="flex-1 p-5 overflow-y-auto w-full max-h-full">
@@ -1361,6 +1675,7 @@ export default function PropertiesPanel({ block, onChange, project, updateProjec
         {activeTab === 'world' && renderWorldTab()}
         {activeTab === 'kanban' && renderKanbanTab()}
         {activeTab === 'factions' && renderFactionsTab()}
+        {activeTab === 'dict' && renderDictionaryTab()}
         {activeTab === 'props' && (
           !block ? renderPageProps() : (
             <div className="flex flex-col gap-6 pb-20">
@@ -1372,11 +1687,38 @@ export default function PropertiesPanel({ block, onChange, project, updateProjec
                  {block.type === 'text' && renderTextProps(block as TextBlock)}
                  {block.type === 'image' && renderImageProps(block as ImageBlock)}
                  {block.type === 'dialogue' && renderDialogueProps(block as DialogueBlock)}
+                 {block.type === 'callout' && renderCalloutProps(block)}
+                 {block.type === 'table' && renderTableProps(block)}
+                 {block.type === 'divider' && renderDividerProps(block)}
                </div>
             </div>
           )
         )}
       </div>
+
+      {optionsModal && optionsModal.isOpen && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[200] flex justify-center items-center no-print" dir="rtl">
+           <div className="bg-[var(--panel)] border border-[var(--border)] w-[450px] max-w-[90vw] rounded-xl flex flex-col shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 p-6 gap-4">
+               <h3 className="text-xl font-bold text-white flex items-center gap-2"><Sparkles className="text-yellow-500"/> خيارات الأحداث القادمة</h3>
+               <p className="text-[var(--text-dim)] text-sm">اختر المسار الذي ترغب في إضافته للقصة من الخيارات المقترحة من قبل الذكاء الاصطناعي (Gemini):</p>
+               <div className="flex flex-col gap-3 mt-2">
+                 {optionsModal.options.map((opt, i) => (
+                   <button 
+                     key={i} 
+                     onClick={() => optionsModal.onSelect(i)} 
+                     className="w-full text-right p-4 rounded-lg bg-[var(--bg)] border border-[var(--border)] hover:border-[var(--accent)] hover:bg-[rgba(168,85,247,0.1)] transition-colors text-sm leading-relaxed"
+                   >
+                     <span className="font-bold text-[var(--accent)] mb-1 block">خيار {i + 1}</span>
+                     {opt}
+                   </button>
+                 ))}
+               </div>
+               <button onClick={() => setOptionsModal(null)} className="mt-2 text-[var(--text-dim)] hover:text-white transition-colors py-2 text-sm">
+                 إلغاء
+               </button>
+           </div>
+        </div>
+      )}
     </div>
   );
 }

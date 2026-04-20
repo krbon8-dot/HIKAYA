@@ -1,12 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import localforage from 'localforage';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
-import { Type, ImageIcon, MessageSquare, GripVertical, Trash2, Save, Printer, Plus, ChevronLeft, ChevronRight, FilePlus, FolderClock, X, Loader2, Focus, Grid, Cloud, LogOut, User as UserIcon } from 'lucide-react';
+import { Type, ImageIcon, MessageSquare, GripVertical, Trash2, Save, Printer, Plus, ChevronLeft, ChevronRight, FilePlus, FolderClock, X, Loader2, Focus, Grid, Cloud, LogOut, User as UserIcon, Sparkles, Send, Square, LayoutTemplate, Minus } from 'lucide-react';
 import { StoryBlock, ProjectData, ProjectPage } from '../types';
 import { generateId, cn } from '../lib/utils';
 import TextEditor from './blocks/TextEditor';
 import ImageEditor from './blocks/ImageEditor';
 import DialogueEditor from './blocks/DialogueEditor';
+import TableEditor from './blocks/TableEditor';
+import DividerEditor from './blocks/DividerEditor';
+import CalloutEditor from './blocks/CalloutEditor';
 import PropertiesPanel from './PropertiesPanel';
 import AISettingsModal from './AISettingsModal';
 
@@ -69,6 +72,11 @@ export default function StoryEditor() {
   const [showProjectsModal, setShowProjectsModal] = useState(false);
   const [showPrintModal, setShowPrintModal] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [showChatModal, setShowChatModal] = useState(false);
+  const [chatMessages, setChatMessages] = useState<{role: 'user'|'ai', content: string}[]>([]);
+  const [chatInput, setChatInput] = useState('');
+  const [isChatting, setIsChatting] = useState(false);
+
   const [printType, setPrintType] = useState<'none' | 'current' | 'all'>('none');
   const [toastMsg, setToastMsg] = useState('');
   const [confirmDialog, setConfirmDialog] = useState<{msg: string, action: () => void} | null>(null);
@@ -229,6 +237,16 @@ export default function StoryEditor() {
       newBlock.avatarUrl = '';
       newBlock.direction = 'rtl';
       newBlock.bubbleType = 'speech';
+    } else if (type === 'table') {
+      newBlock.columns = 2;
+      newBlock.rows = [['عمود 1', 'عمود 2'], ['نصف يمين', 'نصف يسار']];
+      newBlock.align = 'center';
+    } else if (type === 'divider') {
+      newBlock.style = 'solid';
+      newBlock.thickness = 2;
+    } else if (type === 'callout') {
+      newBlock.content = 'نص توضيحي أو تذكر...';
+      newBlock.calloutType = 'note';
     }
     updatePageBlocks([...blocks, newBlock]);
     setSelectedBlockId(newBlock.id);
@@ -255,19 +273,36 @@ export default function StoryEditor() {
     setShowPrintModal(false);
     setPrintType(printAll ? 'all' : 'current');
     
-    // Set document title to project name so PDF filename is correct
-    const originalTitle = document.title;
-    document.title = project.name || 'HIKAYA_STORY';
-
     // Give React time to render all pages into the DOM print-only container
-    setTimeout(() => {
+    setTimeout(async () => {
       try {
-        window.print();
-        // Restore title after a delay to allow print spooler to catch it
-        setTimeout(() => { document.title = originalTitle; }, 1000);
+        const element = document.querySelector('.print-only-container');
+        if (!element) throw new Error("Print container not found");
+        
+        showToast("جاري تجهيز وإنشاء ملف PDF...");
+        
+        // Dynamically import html2pdf to avoid bloating the main bundle
+        // @ts-ignore
+        const html2pdf = (await import('html2pdf.js')).default || (await import('html2pdf.js'));
+        
+        const opt = {
+          margin:       0,
+          filename:     `${project.name || 'Hikaya_Story'}.pdf`,
+          image:        { type: 'jpeg', quality: 0.98 },
+          html2canvas:  { scale: 2, useCORS: true, allowTaint: true, logging: false },
+          jsPDF:        { unit: 'px', format: [project.pageWidth || 624, 880], orientation: 'portrait' }
+        };
+        
+        // To support correct page breaks in html2pdf
+        opt.jsPDF = { unit: 'pt', format: 'a4', orientation: 'portrait' };
+        opt.pagebreak = { mode: ['css', 'legacy'] };
+
+        await html2pdf().set(opt).from(element).save();
+        showToast("تم تنزيل ملف PDF بنجاح! ✅");
       } catch (err) {
-        console.error("Print failed:", err);
-        showToast("عذراً، المتصفح يمنع الطباعة التلقائية. جرب الضغط على Ctrl+P يدوياً أو فتح التطبيق في نافذة مستقلة.");
+        console.error("Print to PDF failed:", err);
+        showToast("عذراً، حدث خطأ أثناء إنشاء PDF.");
+      } finally {
         setPrintType('none');
       }
     }, 800);
@@ -317,6 +352,9 @@ export default function StoryEditor() {
       case 'text': return <TextEditor block={block as any} project={project} onChange={(u) => updateBlock(block.id, u)} onClick={() => setSelectedBlockId(block.id)} />;
       case 'image': return <ImageEditor block={block as any} onChange={(u) => updateBlock(block.id, u)} onClick={() => setSelectedBlockId(block.id)} />;
       case 'dialogue': return <DialogueEditor block={block as any} onChange={(u) => updateBlock(block.id, u)} onClick={() => setSelectedBlockId(block.id)} />;
+      case 'table': return <TableEditor block={block as any} onChange={(u) => updateBlock(block.id, u)} onClick={() => setSelectedBlockId(block.id)} />;
+      case 'divider': return <DividerEditor block={block as any} onChange={(u) => updateBlock(block.id, u)} onClick={() => setSelectedBlockId(block.id)} />;
+      case 'callout': return <CalloutEditor block={block as any} onChange={(u) => updateBlock(block.id, u)} onClick={() => setSelectedBlockId(block.id)} />;
       default: return null;
     }
   };
@@ -334,6 +372,8 @@ export default function StoryEditor() {
           direction: b.align === 'left' ? 'ltr' : 'rtl',
           color: b.color || '#000',
           fontFamily: b.fontFamily ? `var(--font-${b.fontFamily})` : undefined,
+          fontSize: b.fontSize ? `${b.fontSize}px` : undefined,
+          lineHeight: b.fontSize ? '1.5' : undefined,
           textAlign: b.align === 'center' ? 'center' : (b.align === 'left' ? 'left' : 'right')
         }} className={cn(
           "w-full min-h-[80px] p-4 break-words relative z-10",
@@ -441,6 +481,62 @@ export default function StoryEditor() {
         </div>
       );
     }
+    if (block.type === 'table') {
+      const b = block as any;
+      return (
+        <div {...props} className={cn("py-4 pb-0 w-full flex relative z-10", b.align === 'center' ? 'justify-center' : b.align === 'left' ? 'justify-start' : 'justify-end')}>
+           <table className="border-collapse border border-gray-400 max-w-full" style={{ tableLayout: 'fixed' }}>
+              <tbody>
+                {(b.rows || []).map((row: string[], rIdx: number) => (
+                  <tr key={rIdx} className={rIdx === 0 ? "bg-gray-100 font-bold" : "border-t border-gray-300"}>
+                    {row.map((cell: string, cIdx: number) => (
+                      <td key={cIdx} className="border border-gray-400 p-3 whitespace-pre-wrap break-words" dir="rtl">
+                        {cell}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+           </table>
+        </div>
+      );
+    }
+    if (block.type === 'divider') {
+      const b = block as any;
+      const getStyleParams = () => {
+        if (b.style === 'wavy') return { borderTop: `${b.thickness || 2}px solid ${b.color || '#d1d5db'}` };
+        return { borderTop: `${b.thickness || 2}px ${b.style || 'solid'} ${b.color || '#d1d5db'}` };
+      };
+      return (
+        <div {...props} className="py-6 w-full flex items-center justify-center relative z-10">
+          <hr style={b.style !== 'wavy' ? getStyleParams() : { borderTop: `${b.thickness||2}px dashed ${b.color||'#ccc'}`}} className="w-4/5 mx-auto" />
+        </div>
+      );
+    }
+    if (block.type === 'callout') {
+      const b = block as any;
+      const getClasses = () => {
+        switch (b.calloutType) {
+          case 'flashback': return "bg-gray-100 border-gray-400 text-gray-800 italic";
+          case 'warning': return "bg-red-50 border-red-300 text-red-900";
+          case 'info': return "bg-blue-50 border-blue-300 text-blue-900";
+          case 'quote': return "bg-amber-50 border-amber-300 text-amber-900 font-serif";
+          case 'note':
+          default: return "bg-yellow-50 border-yellow-300 text-yellow-900";
+        }
+      };
+      return (
+        <div {...props} className="py-4 w-full relative z-10">
+           <div 
+             className={cn("w-full rounded-xl border p-5 font-sans text-lg leading-relaxed shadow-sm block break-inside-avoid px-8", getClasses())}
+             style={b.backgroundColor ? { backgroundColor: b.backgroundColor, color: b.textColor } : {}}
+             dir="rtl"
+           >
+             <div className="whitespace-pre-wrap">{b.content}</div>
+           </div>
+        </div>
+      );
+    }
     return null;
   };
 
@@ -540,6 +636,13 @@ export default function StoryEditor() {
               <Cloud size={18} />
             </button>
             <button 
+               onClick={() => setShowChatModal(true)}
+               className="px-2 py-1.5 bg-transparent border border-blue-500/50 hover:bg-blue-500/10 text-blue-500 rounded text-[0.85rem] transition-colors flex items-center gap-2"
+               title="مساعد الكاتب (AI)"
+            >
+              <Sparkles size={16} /> <span className="hidden sm:inline">مساعد الكاتب</span>
+            </button>
+            <button 
               onClick={() => setIsFocusMode(!isFocusMode)} 
               className={cn("px-2 py-1.5 border rounded text-[0.85rem] transition-colors flex items-center gap-2", isFocusMode ? "bg-[var(--accent)] border-[var(--accent)] text-white" : "bg-transparent border-[var(--border)] hover:bg-[#2a2a2a] text-[var(--text)]")}
               title="وضع التركيز"
@@ -569,6 +672,16 @@ export default function StoryEditor() {
               </button>
               <button onClick={() => addBlock('dialogue')} className="w-10 h-10 rounded-lg flex items-center justify-center text-[var(--text-dim)] hover:bg-[rgba(168,85,247,0.15)] hover:text-[var(--accent)] transition-all group relative" title="إضافة حوار">
                 <MessageSquare size={22} className="group-active:scale-95 transition-transform" />
+              </button>
+              <div className="w-6 h-px bg-[var(--border)] my-1" />
+              <button onClick={() => addBlock('table')} className="w-10 h-10 rounded-lg flex items-center justify-center text-[var(--text-dim)] hover:bg-[rgba(168,85,247,0.15)] hover:text-[var(--accent)] transition-all group relative" title="إضافة جدول">
+                <LayoutTemplate size={22} className="group-active:scale-95 transition-transform" />
+              </button>
+              <button onClick={() => addBlock('divider')} className="w-10 h-10 rounded-lg flex items-center justify-center text-[var(--text-dim)] hover:bg-[rgba(168,85,247,0.15)] hover:text-[var(--accent)] transition-all group relative" title="إضافة خط فاصل">
+                <Minus size={22} className="group-active:scale-95 transition-transform" />
+              </button>
+              <button onClick={() => addBlock('callout')} className="w-10 h-10 rounded-lg flex items-center justify-center text-[var(--text-dim)] hover:bg-[rgba(168,85,247,0.15)] hover:text-[var(--accent)] transition-all group relative" title="إضافة مربع منسق">
+                <Square size={22} className="group-active:scale-95 transition-transform" />
               </button>
           </aside>
         )}
@@ -789,6 +902,7 @@ export default function StoryEditor() {
         <div className="print-only-container w-full bg-white text-black p-4 relative" dir="rtl">
            <button 
              onClick={() => setPrintType('none')}
+             data-html2canvas-ignore="true"
              className="no-print fixed top-6 right-6 bg-red-600 hover:bg-red-700 text-white px-6 py-3 rounded-full flex items-center gap-2 shadow-2xl z-[9999] font-bold text-lg"
            >
              <X className="w-6 h-6" />
@@ -860,6 +974,86 @@ export default function StoryEditor() {
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* AI Writer Assistant Chat Modal */}
+      {showChatModal && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[200] flex justify-end p-4 animate-in fade-in sm:p-0 sm:pt-16 sm:pr-16 no-print" onClick={() => setShowChatModal(false)} dir="rtl">
+           <div 
+             className="bg-[var(--panel)] border-l border-t border-b border-[var(--border)] w-full max-w-md h-full rounded-r-none rounded-l-2xl sm:h-[calc(100vh-64px)] shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-left"
+             onClick={e => e.stopPropagation()}
+           >
+              <div className="p-4 border-b border-[var(--border)] flex justify-between items-center bg-[#111]">
+                 <h2 className="font-bold flex items-center gap-2"><Sparkles className="text-blue-500" size={20} /> مساعد الكاتب الذكي</h2>
+                 <button onClick={() => setShowChatModal(false)} className="text-[var(--text-dim)] hover:text-white"><X size={20} /></button>
+              </div>
+              <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-4">
+                 {chatMessages.length === 0 && (
+                   <div className="text-center text-[var(--text-dim)] my-auto opacity-60 flex flex-col items-center gap-3">
+                     <Sparkles size={40} className="text-blue-500/50" />
+                     <p>أنا مساعدك في كتابة الروايات وبناء العوالم.<br/>بإمكاني اقتراح أحداث، أسماء، تصحيح الأفكار، أو مناقشة الحبكة معك.</p>
+                   </div>
+                 )}
+                 {chatMessages.map((msg, i) => (
+                    <div key={i} className={cn("max-w-[85%] p-3 rounded-2xl whitespace-pre-wrap leading-relaxed text-sm shadow-sm", msg.role === 'user' ? "bg-blue-600/20 text-blue-100 self-end rounded-tl-sm border border-blue-500/30" : "bg-[var(--bg)] text-[var(--text)] border border-[var(--border)] self-start rounded-tr-sm")}>
+                      {msg.content}
+                    </div>
+                 ))}
+                 {isChatting && (
+                   <div className="self-start bg-[var(--bg)] border border-[var(--border)] p-3 rounded-2xl rounded-tr-sm flex items-center gap-2 text-[var(--text-dim)]">
+                     <Loader2 size={16} className="animate-spin" /> يكتب...
+                   </div>
+                 )}
+              </div>
+              <div className="p-4 bg-[var(--bg)] border-t border-[var(--border)]">
+                 <form 
+                   onSubmit={async (e) => {
+                     e.preventDefault();
+                     if (!chatInput.trim() || isChatting) return;
+                     const query = chatInput.trim();
+                     setChatInput('');
+                     const newMessages = [...chatMessages, { role: 'user' as const, content: query }];
+                     setChatMessages(newMessages);
+                     setIsChatting(true);
+                     
+                     try {
+                       const { generateSuggestion } = await import('../lib/aiService');
+                       // pass the last few messages as context if needed, but for simplicity we just pass the query.
+                       // The aiService currently takes a single string. It's smart enough.
+                       // To make it conversational, we can stringify the history.
+                       const historyContext = newMessages.map(m => `${m.role === 'user' ? 'الكاتب' : 'المساعد'}: ${m.content}`).join('\n');
+                       
+                       const response = await generateSuggestion(historyContext, 'chat', project);
+                       
+                       if (response) {
+                         setChatMessages([...newMessages, { role: 'ai', content: response }]);
+                       } else {
+                         setChatMessages([...newMessages, { role: 'ai', content: 'عذراً، حدث خطأ أثناء الاتصال بالذكاء الاصطناعي.' }]);
+                       }
+                     } finally {
+                       setIsChatting(false);
+                     }
+                   }}
+                   className="flex gap-2"
+                 >
+                   <input 
+                     type="text" 
+                     value={chatInput}
+                     onChange={e => setChatInput(e.target.value)}
+                     placeholder="اسألني عن الحبكة، الشخصيات، التسميات..." 
+                     className="flex-1 bg-[var(--panel)] border border-[var(--border)] rounded-full px-4 py-2 text-sm focus:outline-none focus:border-blue-500"
+                   />
+                   <button 
+                     type="submit" 
+                     disabled={!chatInput.trim() || isChatting}
+                     className="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-600/50 text-white w-10 h-10 rounded-full flex items-center justify-center transition-colors flex-shrink-0"
+                   >
+                     <Send size={18} className="rtl:-scale-x-100 mr-1" />
+                   </button>
+                 </form>
+              </div>
+           </div>
         </div>
       )}
 

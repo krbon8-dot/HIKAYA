@@ -1,4 +1,4 @@
-export type BlockType = 'text' | 'image' | 'dialogue';
+export type BlockType = 'text' | 'image' | 'dialogue' | 'table' | 'divider' | 'callout';
 
 export interface BaseBlock {
   id: string;
@@ -12,6 +12,7 @@ export interface TextBlock extends BaseBlock {
   align: 'right' | 'center' | 'left';
   color?: string;
   fontFamily?: string;
+  fontSize?: number; // Custom font size override
 }
 
 export interface ImageData {
@@ -43,7 +44,29 @@ export interface DialogueBlock extends BaseBlock {
   bubbleHeight?: number | 'auto';
 }
 
-export type StoryBlock = TextBlock | ImageBlock | DialogueBlock;
+export interface TableBlock extends BaseBlock {
+  type: 'table';
+  columns: 1 | 2 | 3 | 4;
+  rows: string[][];
+  align?: 'right' | 'center' | 'left';
+}
+
+export interface DividerBlock extends BaseBlock {
+  type: 'divider';
+  style: 'solid' | 'dashed' | 'dotted' | 'double' | 'wavy';
+  color?: string;
+  thickness?: number;
+}
+
+export interface CalloutBlock extends BaseBlock {
+  type: 'callout';
+  content: string;
+  calloutType: 'flashback' | 'note' | 'warning' | 'info';
+  backgroundColor?: string;
+  textColor?: string;
+}
+
+export type StoryBlock = TextBlock | ImageBlock | DialogueBlock | TableBlock | DividerBlock | CalloutBlock;
 
 export interface Chapter {
   id: string;
@@ -71,6 +94,7 @@ export interface Character {
   goal?: string;
   factionIds?: string[];
   healthStatus?: string;
+  role?: 'main' | 'secondary' | 'dead' | 'unappeared';
 }
 
 export interface Faction {
@@ -146,8 +170,16 @@ export interface Location {
   guilds?: string;
 }
 
+export interface DictionaryWord {
+  id: string;
+  word: string;
+  meaning: string;
+  notes?: string;
+}
+
 export interface AISettings {
-  apiKey: string;
+  apiKeys: string[];
+  imageApiKeys: string[];
   modelType: 'flash' | 'pro';
   modelName: string;
 }
@@ -174,4 +206,5 @@ export interface ProjectData {
   planningItems?: PlanningItem[];
   subplots?: Subplot[];
   locations?: Location[];
+  dictionary?: DictionaryWord[];
 }
