@@ -15,6 +15,7 @@
 تصور بصري فوري: رؤية الحوارات داخل فقاعات والعمل على توزيع الصور يجعلك تشعر بجمالية العمل قبل نشره، مما يحفز الاستمرارية.
 احترافية المخرج النهائي: يضمن لك التطبيق مخرجاً نهائياً (PDF) منسقاً بشكل جذاب لا يحتاج لتدخل من مصممي جرافيك.
 باختصار، "حكاية" هو رفيق الكاتب العصري الذي يجمع بين "فن الكتابة" و "قوة التقنية" في مساحة إبداعية واحدة.
+<blockquote class="imgur-embed-pub" lang="en" data-id="a/mRYTO52" data-context="false" ><a href="//imgur.com/a/mRYTO52"></a></blockquote><script async src="//s.imgur.com/min/embed.js" charset="utf-8"></script>
 
 ## Run Locally
 
