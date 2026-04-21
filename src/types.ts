@@ -46,7 +46,7 @@ export interface DialogueBlock extends BaseBlock {
 
 export interface TableBlock extends BaseBlock {
   type: 'table';
-  columns: 1 | 2 | 3 | 4;
+  columns: 1 | 2 | 3 | 4 | 5 | 6;
   rows: string[][];
   align?: 'right' | 'center' | 'left';
 }
@@ -61,7 +61,7 @@ export interface DividerBlock extends BaseBlock {
 export interface CalloutBlock extends BaseBlock {
   type: 'callout';
   content: string;
-  calloutType: 'flashback' | 'note' | 'warning' | 'info';
+  calloutType: 'flashback' | 'note' | 'warning' | 'info' | 'quote';
   backgroundColor?: string;
   textColor?: string;
 }
@@ -93,8 +93,21 @@ export interface Character {
   inventory?: string[];
   goal?: string;
   factionIds?: string[];
+  familyIds?: string[]; // Allow character to be explicitly linked to families
+  otherGroupIds?: string[]; // Allow linking to other custom divisions
   healthStatus?: string;
   role?: 'main' | 'secondary' | 'dead' | 'unappeared';
+  
+  // Refined Character Profile Fields (#1 Request)
+  age?: string;
+  fears?: string;
+  enemies?: string; // Could be a text describing or listing enemy IDs
+  level?: string;
+  abilities?: { name: string, desc: string }[];
+  beliefId?: string; // Reference to Religions/Beliefs
+  language?: string; // Character language/beliefs string
+  reminders?: string; // Text field for reminders / thoughts
+  currentLocation?: string; // Text field to keep track of current location
 }
 
 export interface Faction {
@@ -184,11 +197,44 @@ export interface AISettings {
   modelName: string;
 }
 
+export interface Religion {
+  id: string;
+  name: string;
+  description: string;
+}
+
+export interface Family {
+  id: string;
+  name: string;
+  type: 'family' | 'tribe';
+  description: string;
+  members_notes?: string;
+}
+
+export interface PlotTwist {
+  id: string;
+  title: string;
+  content: string;
+}
+
+export interface OtherGroup {
+  id: string;
+  name: string;
+  description: string;
+}
+
+export interface FutureQuote {
+  id: string;
+  content: string;
+  link?: string;
+}
+
 export interface ProjectData {
   id: string;
   name: string;
   backgroundColor: string;
   pageWidth?: number;
+  pageFormat?: 'A4' | 'A5' | 'B5' | 'Letter' | 'Manhwa' | 'Manga' | 'WebNovel' | 'Custom';
   pagePadding?: number;
   blockGap?: number;
   pages: ProjectPage[];
@@ -207,4 +253,13 @@ export interface ProjectData {
   subplots?: Subplot[];
   locations?: Location[];
   dictionary?: DictionaryWord[];
+  
+  // Added based on new requests
+  religions?: Religion[];
+  families?: Family[];
+  twists?: PlotTwist[];
+  futureQuotes?: FutureQuote[];
+  
+  // Custom groupings
+  otherGroups?: OtherGroup[];
 }

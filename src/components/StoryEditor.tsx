@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import localforage from 'localforage';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
-import { Type, ImageIcon, MessageSquare, GripVertical, Trash2, Save, Printer, Plus, ChevronLeft, ChevronRight, FilePlus, FolderClock, X, Loader2, Focus, Grid, Cloud, LogOut, User as UserIcon, Sparkles, Send, Square, LayoutTemplate, Minus } from 'lucide-react';
+import { Type, ImageIcon, MessageSquare, GripVertical, Trash2, Save, Printer, Plus, ChevronLeft, ChevronRight, FilePlus, FolderClock, X, Loader2, Focus, Grid, Cloud, LogOut, User as UserIcon, Sparkles, Send, Square, LayoutTemplate, Minus, HelpCircle, Music } from 'lucide-react';
 import { StoryBlock, ProjectData, ProjectPage } from '../types';
 import { generateId, cn } from '../lib/utils';
 import TextEditor from './blocks/TextEditor';
@@ -12,6 +12,7 @@ import DividerEditor from './blocks/DividerEditor';
 import CalloutEditor from './blocks/CalloutEditor';
 import PropertiesPanel from './PropertiesPanel';
 import AISettingsModal from './AISettingsModal';
+import { MusicPlayer } from './MusicPlayer';
 
 const LOCAL_STORAGE_KEY = 'hikaya-projects-v3';
 
@@ -73,6 +74,8 @@ export default function StoryEditor() {
   const [showPrintModal, setShowPrintModal] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [showChatModal, setShowChatModal] = useState(false);
+  const [showHelpModal, setShowHelpModal] = useState(false);
+  const [showMusicPlayer, setShowMusicPlayer] = useState(false);
   const [chatMessages, setChatMessages] = useState<{role: 'user'|'ai', content: string}[]>([]);
   const [chatInput, setChatInput] = useState('');
   const [isChatting, setIsChatting] = useState(false);
@@ -84,6 +87,7 @@ export default function StoryEditor() {
   // New UX Modes
   const [isFocusMode, setIsFocusMode] = useState(false);
   const [showGrid, setShowGrid] = useState(false);
+  const [isPanelExpanded, setIsPanelExpanded] = useState(false);
   
   // Undo/Redo tracking
   const [history, setHistory] = useState<ProjectData[]>([]);
@@ -285,19 +289,20 @@ export default function StoryEditor() {
         // @ts-ignore
         const html2pdf = (await import('html2pdf.js')).default || (await import('html2pdf.js'));
         
-        const opt = {
+        const pdfFormat = project.pageFormat === 'Custom' || !project.pageFormat ? 'a4' : project.pageFormat.toLowerCase();
+        
+        const opt: any = {
           margin:       0,
           filename:     `${project.name || 'Hikaya_Story'}.pdf`,
           image:        { type: 'jpeg', quality: 0.98 },
           html2canvas:  { scale: 2, useCORS: true, allowTaint: true, logging: false },
-          jsPDF:        { unit: 'px', format: [project.pageWidth || 624, 880], orientation: 'portrait' }
+          jsPDF:        { unit: 'mm', format: pdfFormat, orientation: 'portrait' }
         };
         
         // To support correct page breaks in html2pdf
-        opt.jsPDF = { unit: 'pt', format: 'a4', orientation: 'portrait' };
         opt.pagebreak = { mode: ['css', 'legacy'] };
 
-        await html2pdf().set(opt).from(element).save();
+        await (html2pdf as any)().set(opt).from(element).save();
         showToast("تم تنزيل ملف PDF بنجاح! ✅");
       } catch (err) {
         console.error("Print to PDF failed:", err);
@@ -637,36 +642,53 @@ export default function StoryEditor() {
             </button>
             <button 
                onClick={() => setShowChatModal(true)}
-               className="px-2 py-1.5 bg-transparent border border-blue-500/50 hover:bg-blue-500/10 text-blue-500 rounded text-[0.85rem] transition-colors flex items-center gap-2"
+               className="p-1.5 bg-transparent border border-blue-500/50 hover:bg-blue-500/10 text-blue-500 rounded transition-colors"
                title="مساعد الكاتب (AI)"
             >
-              <Sparkles size={16} /> <span className="hidden sm:inline">مساعد الكاتب</span>
+              <MessageSquare size={16} />
+            </button>
+            <button
+              onClick={() => setShowHelpModal(true)}
+              className="p-1.5 bg-transparent border border-slate-500/50 hover:bg-slate-500/10 text-slate-400 rounded transition-colors"
+              title="مساعدة / تعليمات"
+            >
+              <HelpCircle size={16} />
+            </button>
+            <button
+              onClick={() => setShowMusicPlayer(!showMusicPlayer)}
+              className={cn(
+                "p-1.5 border rounded transition-colors flex items-center justify-center",
+                showMusicPlayer ? "bg-orange-500 border-orange-500 text-white" : "bg-transparent border-orange-500/30 hover:bg-orange-500/10 text-orange-400"
+              )}
+              title="موسيقى ملهمة"
+            >
+              <Music size={16} />
             </button>
             <button 
               onClick={() => setIsFocusMode(!isFocusMode)} 
-              className={cn("px-2 py-1.5 border rounded text-[0.85rem] transition-colors flex items-center gap-2", isFocusMode ? "bg-[var(--accent)] border-[var(--accent)] text-white" : "bg-transparent border-[var(--border)] hover:bg-[#2a2a2a] text-[var(--text)]")}
+              className={cn("px-3 py-1.5 border rounded transition-colors flex items-center justify-center", isFocusMode ? "bg-[var(--accent)] border-[var(--accent)] text-white" : "bg-transparent border-[var(--border)] hover:bg-[#2a2a2a] text-[var(--text)]")}
               title="وضع التركيز"
             >
-              <Focus size={16} /> <span className="hidden sm:inline">تركيز</span>
+              <Focus size={16} />
             </button>
-            <button onClick={handleSave} className="px-3 sm:px-4 py-1.5 bg-transparent border border-[var(--border)] hover:bg-[#2a2a2a] rounded text-[0.85rem] text-[var(--text)] transition-colors flex items-center gap-2">
-              <Save size={16} /> <span className="hidden sm:inline">حفظ مجمل</span>
+            <button onClick={handleSave} title="حفظ مجمل" className="px-3 py-1.5 bg-transparent border border-[var(--border)] hover:bg-[#2a2a2a] rounded text-[var(--text)] transition-colors flex items-center justify-center">
+              <Save size={16} />
             </button>
-            <button onClick={() => setShowPrintModal(true)} className="px-3 sm:px-4 py-1.5 bg-[var(--accent)] border border-[var(--accent)] hover:bg-purple-600 rounded text-[0.85rem] text-white transition-colors flex items-center gap-2">
-              <Printer size={16} /> <span className="hidden sm:inline">طباعة</span>
+            <button onClick={() => setShowPrintModal(true)} title="طباعة" className="px-3 py-1.5 bg-[var(--accent)] border border-[var(--accent)] hover:bg-purple-600 rounded text-white transition-colors flex items-center justify-center">
+              <Printer size={16} />
             </button>
           </div>
       </header>
 
       {/* Workspace */}
-      <div className="flex flex-1 overflow-hidden print:block print:h-auto print:overflow-visible">
+      <div className="flex flex-1 overflow-hidden print:block print:h-auto print:overflow-visible relative">
         
         {/* Left Toolbar */}
         {!isFocusMode && (
           <aside className="w-[70px] bg-[var(--panel)] border-l border-[var(--border)] flex flex-col items-center py-6 gap-6 z-10 flex-shrink-0 no-print animate-in slide-in-from-right-4">
-              <button onClick={() => addBlock('text')} className="w-10 h-10 rounded-lg flex items-center justify-center text-[var(--text-dim)] hover:bg-[rgba(168,85,247,0.15)] hover:text-[var(--accent)] transition-all group relative" title="إضافة نص">
-                <Type size={22} className="group-active:scale-95 transition-transform" />
-              </button>
+            <button onClick={() => addBlock('text')} className="w-10 h-10 rounded-lg flex items-center justify-center text-[var(--text-dim)] hover:bg-[rgba(168,85,247,0.15)] hover:text-[var(--accent)] transition-all group relative" title="إضافة نص">
+              <Type size={22} className="group-active:scale-95 transition-transform" />
+            </button>
               <button onClick={() => addBlock('image')} className="w-10 h-10 rounded-lg flex items-center justify-center text-[var(--text-dim)] hover:bg-[rgba(168,85,247,0.15)] hover:text-[var(--accent)] transition-all group relative" title="إضافة صورة">
                 <ImageIcon size={22} className="group-active:scale-95 transition-transform" />
               </button>
@@ -696,7 +718,24 @@ export default function StoryEditor() {
             className="w-full text-black shadow-[0_0_40px_rgba(0,0,0,0.5)] flex flex-col h-fit min-h-full story-container transition-all duration-300 relative print:max-w-none print:w-full print:shadow-none bg-white"
             style={{ 
               backgroundColor: project.backgroundColor,
-              maxWidth: `${project.pageWidth || 624}px`,
+              maxWidth: 
+                project.pageFormat === 'A4' ? '210mm' : 
+                project.pageFormat === 'A5' ? '148mm' : 
+                project.pageFormat === 'B5' ? '176mm' : 
+                project.pageFormat === 'Manga' ? '130mm' :
+                project.pageFormat === 'Manhwa' ? '120mm' :
+                project.pageFormat === 'WebNovel' ? '240mm' :
+                project.pageFormat === 'Letter' ? '216mm' : 
+                `${project.pageWidth || 624}px`,
+              minHeight: 
+                project.pageFormat === 'A4' ? '297mm' : 
+                project.pageFormat === 'A5' ? '210mm' : 
+                project.pageFormat === 'B5' ? '250mm' : 
+                project.pageFormat === 'Manga' ? '180mm' :
+                project.pageFormat === 'Manhwa' ? '500mm' :
+                project.pageFormat === 'WebNovel' ? '297mm' :
+                project.pageFormat === 'Letter' ? '279mm' : 
+                '100%',
               padding: `${project.pagePadding || 0}px`
             }}
             onClick={(e) => { if(e.target === e.currentTarget) setSelectedBlockId(null) }}
@@ -798,13 +837,18 @@ export default function StoryEditor() {
 
         {/* Right Sidebar */}
         {!isFocusMode && (
-          <aside className="w-[320px] bg-[var(--panel)] border-r border-[var(--border)] flex flex-col overflow-hidden z-10 flex-shrink-0 no-print animate-in slide-in-from-left-4">
+          <aside className={cn(
+            "bg-[var(--panel)] border-r border-[var(--border)] flex flex-col overflow-hidden z-20 flex-shrink-0 no-print animate-in slide-in-from-left-4 transition-all duration-300",
+            isPanelExpanded ? "absolute inset-0 w-full h-full" : "w-[320px] relative"
+          )}>
               <PropertiesPanel 
                 block={selectedBlock} 
                 onChange={updateBlock} 
                 project={project}
                 updateProject={updateProject}
                 activePageId={activePageId}
+                isExpanded={isPanelExpanded}
+                onToggleExpand={() => setIsPanelExpanded(!isPanelExpanded)}
               />
           </aside>
         )}
@@ -899,7 +943,7 @@ export default function StoryEditor() {
       </div>
 
       {printType !== 'none' && (
-        <div className="print-only-container w-full bg-white text-black p-4 relative" dir="rtl">
+        <div className="print-only-container bg-white text-black relative flex flex-col items-center py-8" dir="rtl" style={{ minWidth: 'min-content' }}>
            <button 
              onClick={() => setPrintType('none')}
              data-html2canvas-ignore="true"
@@ -911,15 +955,32 @@ export default function StoryEditor() {
            {pagesToRenderForPrint.map((page, idx) => (
              <div 
                key={page.id} 
-               className="mx-auto mb-8 break-after-page relative overflow-hidden"
+               className="mx-auto mb-8 break-after-page shadow-md relative overflow-hidden bg-white"
                style={{ 
-                 backgroundColor: project.backgroundColor,
-                 maxWidth: `${project.pageWidth || 624}px`,
-                 padding: `${project.pagePadding || 0}px`,
+                 width: 
+                    project.pageFormat === 'A4' ? '210mm' : 
+                    project.pageFormat === 'A5' ? '148mm' : 
+                    project.pageFormat === 'B5' ? '176mm' : 
+                    project.pageFormat === 'Manga' ? '130mm' :
+                    project.pageFormat === 'Manhwa' ? '120mm' :
+                    project.pageFormat === 'WebNovel' ? '240mm' :
+                    project.pageFormat === 'Letter' ? '216mm' : 
+                    project.pageFormat === 'Custom' || !project.pageFormat ? `${project.pageWidth || 624}px` : '210mm',
+                 minHeight: 
+                    project.pageFormat === 'A4' ? '297mm' : 
+                    project.pageFormat === 'A5' ? '210mm' : 
+                    project.pageFormat === 'B5' ? '250mm' : 
+                    project.pageFormat === 'Manga' ? '180mm' :
+                    project.pageFormat === 'Manhwa' ? '500mm' :
+                    project.pageFormat === 'WebNovel' ? '297mm' :
+                    project.pageFormat === 'Letter' ? '279mm' : 
+                    project.pageFormat === 'Custom' || !project.pageFormat ? '100vh' : '297mm',
+                 padding: `${project.pagePadding || 20}px`,
                  display: 'flex',
                  flexDirection: 'column',
                  gap: `${project.blockGap || 0}px`,
-                 minHeight: '100vh',
+                 boxSizing: 'border-box',
+                 backgroundColor: project.backgroundColor || 'white'
                }}
              >
                {/* Background Image Layer for Print */}
@@ -973,6 +1034,60 @@ export default function StoryEditor() {
                 نعم، تأكيد
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Help / Tutorial Modal */}
+      {showHelpModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[200] flex justify-center items-center no-print p-4">
+          <div className="bg-[var(--panel)] border border-[var(--border)] w-full max-w-2xl max-h-[85vh] rounded-xl flex flex-col shadow-2xl overflow-hidden animate-in fade-in zoom-in-95">
+             <div className="p-5 border-b border-[var(--border)] flex justify-between items-center bg-[#111]">
+                <h2 className="text-xl font-bold flex items-center gap-2"><HelpCircle className="text-slate-400"/> شرح استخدام التطبيق</h2>
+                <button onClick={() => setShowHelpModal(false)} className="text-[var(--text-dim)] hover:text-white"><X size={24}/></button>
+             </div>
+             
+             <div className="p-6 overflow-y-auto flex flex-col gap-6" dir="rtl">
+                
+                <section className="flex flex-col gap-2">
+                   <h3 className="text-lg font-bold text-[var(--accent)] border-b border-[var(--border)] pb-1">مقدمة عن HIKAYA</h3>
+                   <p className="text-sm text-[var(--text-dim)] leading-relaxed">
+                     تطبيق HIKAYA هو بيئة عمل متكاملة لبناء العوالم وكتابة الروايات. يتيح لك التطبيق تصميم صفحات كتابك، بناء قواعد العالم (World Building)، وإدارة الشخصيات وتتبع الحبكات.
+                   </p>
+                </section>
+
+                <section className="flex flex-col gap-2">
+                   <h3 className="text-lg font-bold text-blue-400 border-b border-[var(--border)] pb-1">أدوات بناء الصفحة (المحرر)</h3>
+                   <ul className="text-sm text-[var(--text-dim)] leading-relaxed list-disc list-inside flex flex-col gap-1">
+                     <li><strong>النص:</strong> يمكنك إضافة فقرات، عناوين عريضة (H1, H2)، أو اقتباسات، والتحكم بالخط والمحاذاة واللون.</li>
+                     <li><strong>الصورة:</strong> رفع لقطات توضيحية أو مشاهد يمكن تصميم شكلها داخل الصفحة.</li>
+                     <li><strong>الحوار:</strong> عنصر مخصص لإدراج محادثات الشخصيات مع توضيح شكل فقاعة الحوار واسم المتحدث بأسلوب القصص المصورة.</li>
+                     <li><strong>صندوق التنبيه (Callout):</strong> يستخدم لإدراج ملاحظات، تحذيرات، أو ذكريات بارزة.</li>
+                     <li><strong>الجدول:</strong> لعرض بيانات منظمة، مثل الجداول الزمنية أو قوائم. (يدعم حتى 4 أعمدة)</li>
+                     <li><strong>الفاصل:</strong> خط يفصل بين المشاهد.</li>
+                     <li><strong>إعدادات الذكاء الاصطناعي ☁️:</strong> لا تنسَ إدخال مفتاح (Gemini API Key) الخاص بك من الإعدادات لاستخدام ميزات التوليد المتوفرة (أفكار، تحسين نص).</li>
+                   </ul>
+                </section>
+
+                <section className="flex flex-col gap-2">
+                   <h3 className="text-lg font-bold text-amber-500 border-b border-[var(--border)] pb-1">القائمة الجانبية (بناء العالم)</h3>
+                   <ul className="text-sm text-[var(--text-dim)] leading-relaxed list-disc list-inside flex flex-col gap-1">
+                     <li><strong>خصائص (⚙️):</strong> التحكم بستايل الصفحة الكامل (لون الخلفية، الهوامش...).</li>
+                     <li><strong>شخصيات (👥):</strong> بناء ملفات الشخصيات مفصلة تشمل الأهداف، المخاوف، القدرات... إلخ.</li>
+                     <li><strong>سيناريو (📄):</strong> تخطيط خط القصة الرئيسي، وكتابة أفكار للحبكات (Twists).</li>
+                     <li><strong>العالم (📖):</strong> تسجيل معلومات المواقع الجغرافية وموسوعة العالم.</li>
+                     <li><strong>تخطيط ( Kanban ):</strong> ترتيب مهام الكتابة لمتابعة سير العمل والفصول.</li>
+                     <li><strong>النقابات (🛡️):</strong> ربط الشخصيات بالطوائف والعائلات.</li>
+                     <li><strong>القاموس (A):</strong> إنشاء لغات مبتكرة وقوائم للأديان والمعتقدات لفهم عالم الرواية.</li>
+                   </ul>
+                </section>
+
+                <div className="mt-4 pt-4 border-t border-[var(--border)] w-full text-center">
+                   <p className="text-sm font-bold text-[var(--text)] opacity-80 decoration-dashed underline">
+                     تم عمل هذا التطبيق من قبل شاكر عيد البراك
+                   </p>
+                </div>
+             </div>
           </div>
         </div>
       )}
@@ -1056,6 +1171,11 @@ export default function StoryEditor() {
            </div>
         </div>
       )}
+
+      <MusicPlayer 
+        isOpen={showMusicPlayer} 
+        onClose={() => setShowMusicPlayer(false)} 
+      />
 
     </>
   );

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { StoryBlock, TextBlock, ImageBlock, DialogueBlock, ProjectData, Character, Lore, Relation, KanbanCard, Chapter, Faction, PlanningItem, WorldMapNode } from '../types';
-import { Sparkles, ImagePlus, UserCircle2, Loader2, Palette, Users, FileText, Settings, Plus, Trash2, BookOpen, Link, KanbanSquare, HeartPulse, X, Globe, Shield, Target, Briefcase, Zap, BookA } from 'lucide-react';
+import { Sparkles, ImagePlus, UserCircle2, Loader2, Palette, Users, FileText, Settings, Plus, Minus, ZoomIn, ZoomOut, Trash2, BookOpen, Link, KanbanSquare, HeartPulse, X, Globe, Shield, Target, Briefcase, Zap, BookA, AlertTriangle } from 'lucide-react';
 import { fileToDataUrl, generateId, cn } from '../lib/utils';
 import { generateSuggestion } from '../lib/aiService';
 
@@ -10,6 +10,8 @@ interface Props {
   project: ProjectData;
   updateProject: (updates: Partial<ProjectData>) => void;
   activePageId: string;
+  isExpanded?: boolean;
+  onToggleExpand?: () => void;
 }
 
 const FONTS = [
@@ -18,7 +20,7 @@ const FONTS = [
   { id: 'display', name: 'عريض (Display)' }
 ];
 
-export default function PropertiesPanel({ block, onChange, project, updateProject, activePageId }: Props) {
+export default function PropertiesPanel({ block, onChange, project, updateProject, activePageId, isExpanded, onToggleExpand }: Props) {
   const [isGenerating, setIsGenerating] = useState(false);
   const [activeTab, setActiveTab] = useState<'props' | 'chars' | 'scenario' | 'world' | 'kanban' | 'factions'>('props');
   const [selectedCharId, setSelectedCharId] = useState<string | null>(null);
@@ -164,7 +166,7 @@ export default function PropertiesPanel({ block, onChange, project, updateProjec
         </button>
         <div className="flex gap-2">
           <button 
-            onClick={() => handleAI(b.content, 'proofread', (text) => update({ content: text }))}
+            onClick={() => handleAI(b.content, 'proofread' as any, (text) => update({ content: text }))}
             disabled={isGenerating}
             className="flex-1 bg-[var(--bg)] border border-green-500/50 text-green-500 py-2 rounded text-xs hover:bg-green-500/10 transition-colors flex items-center justify-center gap-1 disabled:opacity-50"
           >
@@ -422,7 +424,7 @@ export default function PropertiesPanel({ block, onChange, project, updateProjec
       <div className="flex flex-col gap-2">
         <label className="text-[0.8rem] text-[var(--text)]">عدد الأعمدة</label>
         <div className="flex border border-[var(--border)] rounded overflow-hidden">
-           {[1, 2, 3, 4].map((colCount) => (
+           {[1, 2, 3, 4, 5, 6].map((colCount) => (
              <button 
                key={colCount}
                onClick={() => {
@@ -434,7 +436,7 @@ export default function PropertiesPanel({ block, onChange, project, updateProjec
                  });
                  update({ columns: colCount, rows: newRows });
                }} 
-               className={`flex-1 py-1.5 text-sm transition-colors border-l last:border-l-0 border-[var(--border)] ${b.columns === colCount ? 'bg-[var(--accent)] text-white' : 'bg-[var(--bg)] hover:bg-[var(--border)]'}`}
+               className={`flex-1 py-1.5 text-xs sm:text-sm transition-colors border-l last:border-l-0 border-[var(--border)] ${b.columns === colCount ? 'bg-[var(--accent)] text-white' : 'bg-[var(--bg)] hover:bg-[var(--border)]'}`}
              >
                {colCount}
              </button>
@@ -618,17 +620,45 @@ export default function PropertiesPanel({ block, onChange, project, updateProjec
         </div>
 
         <div className="flex flex-col gap-2">
-          <label className="text-[0.8rem] text-[var(--text)] flex justify-between">
-            <span>عرض الصفحة</span>
-            <span className="text-[var(--accent)] font-mono">{project.pageWidth || 624}px</span>
-          </label>
-          <input 
-            type="range" min="400" max="1400" step="10"
-            value={project.pageWidth || 624} 
-            onChange={e => updateProject({ pageWidth: Number(e.target.value) })}
-            className="accent-[var(--accent)]"
-          />
+          <label className="text-[0.8rem] text-[var(--accent)] font-bold">حجم الصفحة (للقراءة / للطباعة)</label>
+          <select
+            value={project.pageFormat || 'Custom'}
+            onChange={e => updateProject({ pageFormat: e.target.value as any })}
+            className="w-full bg-[var(--bg)] border border-[var(--border)] p-2 rounded text-sm text-[var(--text)] outline-none focus:border-[var(--accent)]"
+          >
+            <option value="A4">A4 (210x297mm) - مثالي للهاردكوفر والمستندات</option>
+            <option value="A5">A5 (148x210mm) - مقاس الروايات القياسي</option>
+            <option value="B5">B5 (176x250mm) - مقاس فاخر / للقصص</option>
+            <option value="Manhwa">مانهوا (Webtoon) - طويل جداً للقراءة الرقمية</option>
+            <option value="Manga">مانجا (Tankobon) - 130x180mm</option>
+            <option value="WebNovel">رواية ويب - عرض واسع مريح</option>
+            <option value="Letter">US Letter - طباعة رسائل أمريكية</option>
+            <option value="Custom">تخصيص حر (مخصص للقراءة الرقمية)</option>
+          </select>
         </div>
+
+        {(!project.pageFormat || project.pageFormat === 'Custom') && (
+          <div className="flex flex-col gap-2">
+            <label className="text-[0.8rem] text-[var(--text)] flex justify-between">
+              <span>عرض الصفحة الحر (بالبكسل)</span>
+              <span className="text-[var(--accent)] font-mono">{project.pageWidth || 624}px</span>
+            </label>
+            <input 
+              type="range" min="400" max="1400" step="10"
+              value={project.pageWidth || 624} 
+              onChange={e => updateProject({ pageWidth: Number(e.target.value) })}
+              className="accent-[var(--accent)]"
+            />
+          </div>
+        )}
+
+        <div className="bg-yellow-500/10 border border-yellow-500/30 p-3 rounded-lg flex gap-2 items-start">
+          <AlertTriangle size={18} className="text-yellow-500 shrink-0 mt-0.5" />
+          <p className="text-[10px] text-yellow-200/80 leading-relaxed">
+            تنبيه: تغيير مساحة الهوامش (Padding) أو المسافة بين العناصر (Gap) قد يؤثر بشكل مباشر على مظهر الصفحات عند الطباعة الورقية. يرجى تجربة الطباعة بعد كل تعديل.
+          </p>
+        </div>
+
         <div className="flex flex-col gap-2">
           <label className="text-[0.8rem] text-[var(--text)] flex justify-between">
             <span>الهوامش (Padding)</span>
@@ -754,7 +784,7 @@ export default function PropertiesPanel({ block, onChange, project, updateProjec
 
               <div className="flex flex-col gap-2 flex-1">
                 <label className="text-[0.8rem] text-[var(--text)] flex justify-between">
-                  سمات الشخصية
+                  سمات و ملامح الشخصية
                   <button 
                     onClick={() => handleAI(selectedChar.details, 'narrative', (details) => updateCharacter(selectedChar.id, { details }))}
                     className="text-[var(--accent)] text-xs hover:underline flex items-center gap-1"
@@ -765,22 +795,154 @@ export default function PropertiesPanel({ block, onChange, project, updateProjec
                 <textarea 
                   value={selectedChar.details}
                   onChange={e => updateCharacter(selectedChar.id, { details: e.target.value })}
-                  placeholder="طباعها، دورها في القصة..."
+                  placeholder="طباعها، دورها في القصة، ملامحها..."
                   className="w-full min-h-[80px] bg-[var(--bg)] border border-[var(--border)] p-2 rounded text-sm text-[var(--text)] outline-none focus:border-[var(--accent)]"
                 />
               </div>
 
-              <div className="flex flex-col gap-2">
-                <label className="text-[0.8rem] text-[var(--text)] font-bold text-blue-400">قصة الشخصية (Backstory)</label>
+              <div className="grid grid-cols-2 gap-2 mt-2">
+                <div className="flex flex-col gap-2">
+                  <label className="text-[0.8rem] text-[var(--text)] font-bold text-yellow-500">العمر</label>
+                  <input 
+                     type="text"
+                     value={selectedChar.age || ''}
+                     onChange={e => updateCharacter(selectedChar.id, { age: e.target.value })}
+                     placeholder="مثال: 24 عاماً"
+                     className="w-full bg-[var(--bg)] border border-[var(--border)] p-2 rounded text-sm text-[var(--text)] outline-none focus:border-[var(--accent)]"
+                  />
+                </div>
+                <div className="flex flex-col gap-2">
+                  <label className="text-[0.8rem] text-[var(--text)] font-bold text-indigo-400">مستوى الشخصية (لفل)</label>
+                  <input 
+                     type="text"
+                     value={selectedChar.level || ''}
+                     onChange={e => updateCharacter(selectedChar.id, { level: e.target.value })}
+                     placeholder="مثال: لفل 10 / ساحر أعلى"
+                     className="w-full bg-[var(--bg)] border border-[var(--border)] p-2 rounded text-sm text-[var(--text)] outline-none focus:border-[var(--accent)]"
+                  />
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-2 mt-2">
+                <label className="text-[0.8rem] text-[var(--text)] font-bold text-rose-500">مخاوف الشخصية</label>
                 <textarea 
-                  value={selectedChar.backstory || ''}
-                  onChange={e => updateCharacter(selectedChar.id, { backstory: e.target.value })}
-                  placeholder="ماضيه، نشأته، الأحداث المؤثرة..."
-                  className="w-full min-h-[100px] bg-[var(--bg)] border border-[var(--border)] p-2 rounded text-sm text-[var(--text)] outline-none focus:border-[var(--accent)]"
+                  value={selectedChar.fears || ''}
+                  onChange={e => updateCharacter(selectedChar.id, { fears: e.target.value })}
+                  placeholder="مما تخاف هذه الشخصية؟ ما هي عقدها النفسية؟"
+                  className="w-full min-h-[60px] bg-[var(--bg)] border border-[var(--border)] p-2 rounded text-sm text-[var(--text)] outline-none focus:border-[var(--accent)]"
                 />
               </div>
 
-              <div className="flex flex-col gap-2">
+              <div className="flex flex-col gap-2 mt-2">
+                <label className="text-[0.8rem] text-[var(--text)] font-bold text-red-600">أعداء الشخصية</label>
+                <textarea 
+                  value={selectedChar.enemies || ''}
+                  onChange={e => updateCharacter(selectedChar.id, { enemies: e.target.value })}
+                  placeholder="أسماء الأعداء، أو خصمئيسي، أو جهات تعاديها..."
+                  className="w-full min-h-[60px] bg-[var(--bg)] border border-[var(--border)] p-2 rounded text-sm text-[var(--text)] outline-none focus:border-[var(--accent)]"
+                />
+                <p className="text-[10px] text-[var(--text-dim)]">يمكنك أيضاً ربط الشخصيات المسجلة من قسم "الصلة" بالأسفل كأعداء.</p>
+              </div>
+
+              <div className="flex flex-col gap-2 mt-2">
+                <label className="text-[0.8rem] text-[var(--text)] font-bold text-emerald-400">الدين والاعتقادات واللغة</label>
+                <select 
+                  value={selectedChar.beliefId || ''}
+                  onChange={e => updateCharacter(selectedChar.id, { beliefId: e.target.value })}
+                  className="w-full bg-[var(--bg)] border border-[var(--border)] p-2 rounded text-sm text-[var(--text)] outline-none focus:border-[var(--accent)]"
+                >
+                  <option value="">-- اختر الدين أو الاعتقاد --</option>
+                  {(project.religions || []).map(r => (
+                    <option key={r.id} value={r.id}>{r.name}</option>
+                  ))}
+                </select>
+                <input 
+                  type="text"
+                  placeholder="ما هي لغتها أو معتقدات إضافية؟"
+                  value={selectedChar.language || ''}
+                  onChange={e => updateCharacter(selectedChar.id, { language: e.target.value })}
+                  className="w-full mt-1 bg-[var(--bg)] border border-[var(--border)] p-2 rounded text-sm text-[var(--text)] outline-none focus:border-[var(--accent)]"
+                />
+                <p className="text-[10px] text-[var(--text-dim)]">يتم إضافة الأديان والمعتقدات من قسم اللغة المبتكرة (القاموس).</p>
+              </div>
+
+              <div className="flex flex-col gap-2 mt-2 border-t border-[var(--border)] pt-2">
+                <label className="text-[0.8rem] text-[var(--text)] font-bold text-blue-500">قدرات الشخصية الجسدية والسحرية</label>
+                <div className="flex gap-2">
+                  <input 
+                    type="text" id="new-ability-name"
+                    placeholder="اسم القدرة..."
+                    className="flex-1 bg-[var(--bg)] border border-[var(--border)] p-2 rounded text-sm text-[var(--text)] outline-none focus:border-[var(--accent)] w-1/3"
+                  />
+                  <input 
+                    type="text" id="new-ability-desc"
+                    placeholder="وصف للقدرة..."
+                    className="flex-1 bg-[var(--bg)] border border-[var(--border)] p-2 rounded text-sm text-[var(--text)] outline-none focus:border-[var(--accent)]"
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') {
+                        const nameInput = document.getElementById('new-ability-name') as HTMLInputElement;
+                        const descInput = document.getElementById('new-ability-desc') as HTMLInputElement;
+                        if (nameInput.value.trim() && descInput.value.trim()) {
+                           updateCharacter(selectedChar.id, { 
+                             abilities: [...(selectedChar.abilities || []), { name: nameInput.value.trim(), desc: descInput.value.trim() }] 
+                           });
+                           nameInput.value = '';
+                           descInput.value = '';
+                        }
+                      }
+                    }}
+                  />
+                  <button 
+                    onClick={() => {
+                        const nameInput = document.getElementById('new-ability-name') as HTMLInputElement;
+                        const descInput = document.getElementById('new-ability-desc') as HTMLInputElement;
+                        if (nameInput.value.trim() && descInput.value.trim()) {
+                           updateCharacter(selectedChar.id, { 
+                             abilities: [...(selectedChar.abilities || []), { name: nameInput.value.trim(), desc: descInput.value.trim() }] 
+                           });
+                           nameInput.value = '';
+                           descInput.value = '';
+                        }
+                    }}
+                    className="bg-[var(--accent)] text-white px-3 rounded text-sm"
+                  >إضافة</button>
+                </div>
+                <div className="flex flex-col gap-2 mt-1">
+                  {(selectedChar.abilities || []).map((ab, idx) => (
+                    <div key={idx} className="bg-[var(--bg)] border border-[var(--border)] text-xs p-2 rounded flex flex-col gap-1 relative">
+                      <strong className="text-[var(--accent)] text-sm">{ab.name}</strong>
+                      <span className="text-[var(--text-dim)]">{ab.desc}</span>
+                      <button onClick={() => updateCharacter(selectedChar.id, { abilities: selectedChar.abilities?.filter((_, i) => i !== idx) })} className="absolute top-2 left-2 text-red-400 hover:text-red-300"><X size={14}/></button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-2 mt-2">
+                <label className="text-[0.8rem] text-[var(--text)] font-bold text-cyan-500">تذكيرات أفكار / أعمال (Reminders)</label>
+                <textarea 
+                  value={selectedChar.reminders || ''}
+                  onChange={e => updateCharacter(selectedChar.id, { reminders: e.target.value })}
+                  placeholder="افكار عملتها الشخصية أو ستعملها مستقبلاً..."
+                  className="w-full min-h-[80px] bg-[var(--bg)] border border-[var(--border)] p-2 rounded text-sm text-[var(--text)] outline-none focus:border-[var(--accent)]"
+                />
+              </div>
+
+              <div className="flex flex-col gap-2 mt-4 pt-4 border-t border-[var(--border)]">
+                <label className="text-[0.8rem] text-[var(--text)] font-bold text-indigo-400 flex items-center justify-between">
+                  مكان الشخصية الحالي
+                  <span className="text-[10px] text-[var(--text-dim)] font-normal">لتتذكر موقعها في القصة</span>
+                </label>
+                <input 
+                  type="text"
+                  value={selectedChar.currentLocation || ''}
+                  onChange={e => updateCharacter(selectedChar.id, { currentLocation: e.target.value })}
+                  placeholder="أين تتواجد الشخصية حالياً في أحداث القصة؟"
+                  className="w-full bg-[var(--bg)] border border-[var(--border)] p-2 rounded text-sm text-[var(--text)] outline-none focus:border-[var(--accent)]"
+                />
+              </div>
+
+              <div className="flex flex-col gap-2 mt-4 pt-4 border-t border-[var(--border)]">
                 <label className="text-[0.8rem] text-[var(--text)] font-bold text-green-400">هدف الشخصية (النهائي)</label>
                 <input 
                   type="text"
@@ -852,6 +1014,58 @@ export default function PropertiesPanel({ block, onChange, project, updateProjec
                    })}
                    {(!project.factions || project.factions.length === 0) && (
                      <span className="text-[10px] text-[var(--text-dim)]">لم يتم إنشاء نقابات أو ممالك بعد. أنشئها في قسم النقابات.</span>
+                   )}
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-2 mt-4">
+                <label className="text-[0.8rem] text-[var(--text)] font-bold text-amber-500">العائلة / القبيلة المرتبطة</label>
+                <div className="flex flex-wrap gap-2">
+                   {(project.families || []).map(fam => {
+                      const isActive = selectedChar.familyIds?.includes(fam.id);
+                      return (
+                         <button 
+                           key={fam.id}
+                           onClick={() => {
+                              const curr = selectedChar.familyIds || [];
+                              updateCharacter(selectedChar.id, { 
+                                familyIds: isActive ? curr.filter(id => id !== fam.id) : [...curr, fam.id]
+                              });
+                           }}
+                           className={cn("text-[10px] px-2 py-1 rounded border", isActive ? "bg-amber-600 border-amber-500 text-white" : "bg-transparent border-[var(--border)] text-[var(--text-dim)]")}
+                         >
+                           {fam.name} ({fam.type})
+                         </button>
+                      );
+                   })}
+                   {(!project.families || project.families.length === 0) && (
+                     <span className="text-[10px] text-[var(--text-dim)]">لم يتم إنشاء عائلات بعد. أنشئها في قسم النقابات.</span>
+                   )}
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-2 mt-4">
+                <label className="text-[0.8rem] text-[var(--text)] font-bold text-pink-400">تقسيمات أخرى (مدارس/طوائف/فرق)</label>
+                <div className="flex flex-wrap gap-2">
+                   {(project.otherGroups || []).map(group => {
+                      const isActive = selectedChar.otherGroupIds?.includes(group.id);
+                      return (
+                         <button 
+                           key={group.id}
+                           onClick={() => {
+                              const curr = selectedChar.otherGroupIds || [];
+                              updateCharacter(selectedChar.id, { 
+                                otherGroupIds: isActive ? curr.filter(id => id !== group.id) : [...curr, group.id]
+                              });
+                           }}
+                           className={cn("text-[10px] px-2 py-1 rounded border", isActive ? "bg-pink-600 border-pink-500 text-white" : "bg-transparent border-[var(--border)] text-[var(--text-dim)]")}
+                         >
+                           {group.name}
+                         </button>
+                      );
+                   })}
+                   {(!project.otherGroups || project.otherGroups.length === 0) && (
+                     <span className="text-[10px] text-[var(--text-dim)]">لم يتم إنشاء تقسيمات بعد. أنشئها في قسم النقابات.</span>
                    )}
                 </div>
               </div>
@@ -998,6 +1212,45 @@ export default function PropertiesPanel({ block, onChange, project, updateProjec
             />
             <button 
               onClick={() => updateProject({ alternativeScenarios: project.alternativeScenarios?.filter((_, i) => i !== idx) })}
+              className="absolute top-1 left-1 opacity-0 group-hover:opacity-100 bg-red-500/80 hover:bg-red-500 text-white p-1 rounded transition-opacity"
+            ><Trash2 size={12}/></button>
+          </div>
+        ))}
+      </div>
+
+      <div className="flex flex-col gap-2 mt-4 border-t border-[var(--border)] pt-4">
+        <label className="text-xs font-bold text-rose-500 flex items-center justify-between">
+          <span>أفكار وتويستات الحبكة (Twists)</span>
+          <button 
+            onClick={() => updateProject({ twists: [...(project.twists || []), { id: generateId(), title: 'تويست جديد', content: '' }] })}
+            className="text-[var(--accent)] hover:text-purple-400 p-1"
+          ><Plus size={14}/></button>
+        </label>
+        {(project.twists || []).map((twist, idx) => (
+          <div key={twist.id} className="flex flex-col gap-1 relative group bg-[var(--bg)] border border-[var(--border)] p-2 rounded">
+            <input
+              type="text"
+              value={twist.title}
+              placeholder="عنوان الحبكة / التويست (مثال: خيانة الصديق)"
+              onChange={e => {
+                const newTwists = [...(project.twists || [])];
+                newTwists[idx].title = e.target.value;
+                updateProject({ twists: newTwists });
+              }}
+              className="w-full bg-transparent border-b border-[var(--border)] mb-1 pb-1 text-sm font-bold text-[var(--accent)] outline-none focus:border-[var(--accent)]"
+            />
+            <textarea
+              value={twist.content}
+              placeholder="شرح وتفاصيل الحبكة وكيف يمكن دمجها وكيف يمكن تطبيقها في القصة..."
+              onChange={e => {
+                const newTwists = [...(project.twists || [])];
+                newTwists[idx].content = e.target.value;
+                updateProject({ twists: newTwists });
+              }}
+              className="w-full bg-transparent p-1 rounded text-xs text-[var(--text)] outline-none focus:border-[var(--accent)] min-h-[60px]"
+            />
+            <button 
+              onClick={() => updateProject({ twists: project.twists?.filter(t => t.id !== twist.id) })}
               className="absolute top-1 left-1 opacity-0 group-hover:opacity-100 bg-red-500/80 hover:bg-red-500 text-white p-1 rounded transition-opacity"
             ><Trash2 size={12}/></button>
           </div>
@@ -1378,6 +1631,129 @@ export default function PropertiesPanel({ block, onChange, project, updateProjec
             </div>
           )
         )}
+
+        {/* Families and Tribes Section */}
+        <div className="flex flex-col gap-3 mt-4 border-t border-[var(--border)] pt-4 pb-12">
+          <div className="flex justify-between items-center mb-0">
+             <h3 className="text-xs uppercase tracking-wider text-amber-500 font-bold flex items-center gap-2">العائلات والقبائل</h3>
+             <button onClick={() => updateProject({ families: [...(project.families || []), { id: generateId(), name: 'عائلة/قبيلة جديدة', type: 'family', description: '' }] })} className="p-1 hover:bg-[rgba(245,158,11,0.1)] text-amber-500 rounded transition-colors"><Plus size={16}/></button>
+          </div>
+          
+          {(project.families || []).length === 0 ? (
+             <p className="text-xs text-[var(--text-dim)] text-center py-4">لم يتم إضافة عائلات النبلاء أو القبائل.</p>
+          ) : (
+            (project.families || []).map(fam => (
+              <div key={fam.id} className="flex flex-col gap-2 p-3 bg-black/20 border border-[var(--border)] rounded relative group">
+                <div className="flex justify-between gap-2">
+                  <input 
+                    value={fam.name}
+                    onChange={e => updateProject({ families: project.families!.map(f => f.id === fam.id ? { ...f, name: e.target.value } : f) })}
+                    placeholder="اسم العائلة..."
+                    className="flex-1 bg-transparent border-b border-[var(--border)] p-1 text-sm font-bold text-amber-500 outline-none focus:border-amber-500"
+                  />
+                  <select 
+                    value={fam.type}
+                    onChange={e => updateProject({ families: project.families!.map(f => f.id === fam.id ? { ...f, type: e.target.value as any } : f) })}
+                    className="w-1/3 bg-[var(--bg)] border border-[var(--border)] p-1 rounded text-xs text-[var(--text)] outline-none"
+                  >
+                    <option value="family">عائلة نبيلة</option>
+                    <option value="tribe">قبيلة عشائرية</option>
+                  </select>
+                </div>
+                
+                <div className="flex flex-col gap-1">
+                  <textarea 
+                    value={fam.description || ''}
+                    placeholder="وصف وتاريخ وسمعة العائلة..."
+                    onChange={e => updateProject({ families: project.families!.map(f => f.id === fam.id ? { ...f, description: e.target.value } : f) })}
+                    className="w-full bg-[var(--bg)] min-h-[60px] border border-[var(--border)] p-2 rounded text-xs text-[var(--text)] outline-none focus:border-amber-500"
+                  />
+                </div>
+
+                <div className="flex flex-col gap-1">
+                  <label className="text-[9px] text-[var(--text-dim)]">ملاحظات سرية / علاقات عائلية</label>
+                  <textarea 
+                    value={fam.members_notes || ''}
+                    placeholder="..."
+                    onChange={e => updateProject({ families: project.families!.map(f => f.id === fam.id ? { ...f, members_notes: e.target.value } : f) })}
+                    className="w-full bg-[var(--bg)] min-h-[40px] border border-[var(--border)] p-2 rounded text-xs text-[var(--text)] outline-none focus:border-amber-500 max-h-[100px]"
+                  />
+                </div>
+
+                <div className="flex flex-col gap-1">
+                  <label className="text-[9px] text-[var(--text-dim)]">أعضاء العائلة من الشخصيات</label>
+                  <div className="flex flex-wrap gap-1">
+                     {project.characters?.filter(c => c.familyIds?.includes(fam.id)).map(c => (
+                        <div key={c.id} className="bg-black/30 border border-[var(--border)] px-1.5 py-0.5 rounded text-[10px] flex items-center gap-1">
+                          {c.avatarUrl && <img src={c.avatarUrl} className="w-3 h-3 rounded-full object-cover" />}
+                          {c.name}
+                        </div>
+                     ))}
+                     {(!project.characters || !project.characters.some(c => c.familyIds?.includes(fam.id))) && (
+                        <span className="text-[9px] text-zinc-600">لا يوجد أعضاء. أضفهم من صفحة الشخصية.</span>
+                     )}
+                  </div>
+                </div>
+                
+                <button 
+                  onClick={() => updateProject({ families: project.families!.filter(f => f.id !== fam.id) })}
+                  className="absolute top-2 left-2 opacity-0 group-hover:opacity-100 text-red-500 hover:text-red-400 bg-[var(--bg)] rounded-full p-1 border border-red-500"
+                ><Trash2 size={12} /></button>
+              </div>
+            ))
+          )}
+        </div>
+
+        {/* Other Groups / Divisions Section */}
+        <div className="flex flex-col gap-3 mt-4 border-t border-[var(--border)] pt-4 pb-12">
+          <div className="flex justify-between items-center mb-0">
+             <h3 className="text-xs uppercase tracking-wider text-pink-400 font-bold flex items-center gap-2">تقسيمات أخرى</h3>
+             <button onClick={() => updateProject({ otherGroups: [...(project.otherGroups || []), { id: generateId(), name: 'مجموعة/تقسيم جديد', description: '' }] })} className="p-1 hover:bg-[rgba(244,114,182,0.1)] text-pink-400 rounded transition-colors"><Plus size={16}/></button>
+          </div>
+          
+          <p className="text-[10px] text-[var(--text-dim)]">استخدم هذا القسم لأي تجمع آخر من الشخصيات (مثل طائفة، فرقة، مدرسة، الخ).</p>
+
+          {(project.otherGroups || []).length === 0 ? (
+             <p className="text-xs text-center text-[var(--text-dim)] py-4">لم يتم إضافة تقسيمات أخرى.</p>
+          ) : (
+             (project.otherGroups || []).map(group => (
+               <div key={group.id} className="flex flex-col gap-2 p-3 bg-black/20 border border-[var(--border)] rounded relative group">
+                  <input 
+                    value={group.name}
+                    onChange={e => updateProject({ otherGroups: project.otherGroups!.map(g => g.id === group.id ? { ...g, name: e.target.value } : g) })}
+                    placeholder="اسم التقسيم..."
+                    className="w-full bg-transparent border-b border-[var(--border)] p-1 text-sm font-bold text-pink-400 outline-none focus:border-pink-400"
+                  />
+                  <textarea 
+                    value={group.description || ''}
+                    placeholder="وصف هذا التقسيم..."
+                    onChange={e => updateProject({ otherGroups: project.otherGroups!.map(g => g.id === group.id ? { ...g, description: e.target.value } : g) })}
+                    className="w-full bg-[var(--bg)] min-h-[60px] border border-[var(--border)] p-2 rounded text-xs text-[var(--text)] outline-none focus:border-pink-400"
+                  />
+                  
+                  <div className="flex flex-col gap-1 mt-1">
+                    <label className="text-[9px] text-[var(--text-dim)]">أعضاء هذا القسم من الشخصيات</label>
+                    <div className="flex flex-wrap gap-1">
+                       {project.characters?.filter(c => c.otherGroupIds?.includes(group.id)).map(c => (
+                          <div key={c.id} className="bg-black/30 border border-[var(--border)] px-1.5 py-0.5 rounded text-[10px] flex items-center gap-1">
+                            {c.avatarUrl && <img src={c.avatarUrl} className="w-3 h-3 rounded-full object-cover" />}
+                            {c.name}
+                          </div>
+                       ))}
+                       {(!project.characters || !project.characters.some(c => c.otherGroupIds?.includes(group.id))) && (
+                          <span className="text-[9px] text-zinc-600">لا يوجد أعضاء. أضفهم من صفحة الشخصية.</span>
+                       )}
+                    </div>
+                  </div>
+
+                  <button 
+                    onClick={() => updateProject({ otherGroups: project.otherGroups!.filter(g => g.id !== group.id) })}
+                    className="absolute top-2 left-2 opacity-0 group-hover:opacity-100 text-red-500 hover:text-red-400 bg-[var(--bg)] rounded-full p-1 border border-red-500"
+                  ><Trash2 size={12} /></button>
+               </div>
+             ))
+          )}
+        </div>
       </div>
     );
   };
@@ -1653,20 +2029,109 @@ export default function PropertiesPanel({ block, onChange, project, updateProjec
             ))
           )}
         </div>
+
+        <div className="flex flex-col gap-3 mt-2 border-t border-[var(--border)] pt-4 pb-12">
+          <div className="flex justify-between items-center mb-0">
+             <h3 className="text-xs uppercase tracking-wider text-emerald-400 font-bold flex items-center gap-2">أديان ومعتقدات العالم</h3>
+             <button onClick={() => updateProject({ religions: [...(project.religions || []), { id: generateId(), name: '', description: '' }] })} className="p-1 hover:bg-[rgba(16،85,247,0.1)] text-[var(--accent)] rounded transition-colors"><Plus size={16}/></button>
+          </div>
+          <p className="text-[10px] text-[var(--text-dim)]">أضف الأديان والاعتقادات هنا لتتمكن من ربطها بالشخصيات.</p>
+          {(project.religions || []).length === 0 ? (
+             <p className="text-xs text-center text-[var(--text-dim)] py-4 border border-dashed border-[var(--border)] rounded">لا توجد أديان مسجلة حالياً.</p>
+          ) : (
+             (project.religions || []).map(rel => (
+               <div key={rel.id} className="flex flex-col gap-2 p-3 bg-black/20 border border-[var(--border)] rounded relative group">
+                 <div className="flex flex-col gap-1">
+                   <label className="text-[9px] text-[var(--text-dim)]">اسم الدين / الاعتقاد</label>
+                   <input 
+                     value={rel.name}
+                     onChange={e => updateProject({ religions: project.religions!.map(r => r.id === rel.id ? { ...r, name: e.target.value } : r) })}
+                     className="bg-transparent border-b border-[var(--border)] p-1 text-sm font-bold text-emerald-400 outline-none focus:border-emerald-500"
+                     placeholder="مثال: عقيدة النور"
+                   />
+                 </div>
+                 <div className="flex flex-col gap-1">
+                   <label className="text-[9px] text-[var(--text-dim)]">وصف الاعتقاد والمبادئ</label>
+                   <textarea 
+                     value={rel.description}
+                     onChange={e => updateProject({ religions: project.religions!.map(r => r.id === rel.id ? { ...r, description: e.target.value } : r) })}
+                     className="w-full min-h-[60px] bg-[var(--bg)] border border-[var(--border)] p-2 rounded text-sm text-[var(--text)] outline-none focus:border-emerald-500 max-h-[120px]"
+                   />
+                 </div>
+                 <button 
+                   onClick={() => updateProject({ religions: project.religions!.filter(r => r.id !== rel.id) })}
+                   className="absolute top-2 left-2 opacity-0 group-hover:opacity-100 text-red-500 hover:text-red-400 bg-[var(--bg)] rounded-full p-1"
+                 ><Trash2 size={12} /></button>
+               </div>
+             ))
+          )}
+        </div>
+
+        <div className="flex flex-col gap-3 mt-2 border-t border-[var(--border)] pt-4 pb-12">
+          <div className="flex justify-between items-center mb-0">
+             <h3 className="text-xs uppercase tracking-wider text-rose-400 font-bold flex items-center gap-2">اقتباسات/إلهامات مستقبلية</h3>
+             <button onClick={() => updateProject({ futureQuotes: [...(project.futureQuotes || []), { id: generateId(), content: '', link: '' }] })} className="p-1 hover:bg-[rgba(244,63,94,0.1)] text-[var(--accent)] rounded transition-colors"><Plus size={16}/></button>
+          </div>
+          <p className="text-[10px] text-[var(--text-dim)]">تحفظ هنا أي روابط أو اقتباسات (من يوتيوب، ويكيبيديا وغيرها) لتلهمك بها لاحقاً.</p>
+          {(project.futureQuotes || []).length === 0 ? (
+             <p className="text-xs text-center text-[var(--text-dim)] py-4 border border-dashed border-[var(--border)] rounded">لا توجد اقتباسات حالياً.</p>
+          ) : (
+             (project.futureQuotes || []).map(quote => (
+               <div key={quote.id} className="flex flex-col gap-2 p-3 bg-black/20 border border-[var(--border)] rounded relative group">
+                 <div className="flex flex-col gap-1">
+                   <label className="text-[9px] text-[var(--text-dim)]">محتوى الاقتباس / الفكرة المستلهمة</label>
+                   <textarea 
+                     value={quote.content}
+                     onChange={e => updateProject({ futureQuotes: project.futureQuotes!.map(q => q.id === quote.id ? { ...q, content: e.target.value } : q) })}
+                     className="w-full min-h-[60px] bg-[var(--bg)] border border-[var(--border)] p-2 rounded text-sm text-[var(--text)] outline-none focus:border-rose-400"
+                     placeholder="فكرة أعجبتني أريد تطبيقها..."
+                   />
+                 </div>
+                 <div className="flex flex-col gap-1">
+                   <label className="text-[9px] text-[var(--text-dim)]">رابط المرجع (يوتيوب، مقالة...)</label>
+                   <input 
+                     type="url"
+                     value={quote.link || ''}
+                     onChange={e => updateProject({ futureQuotes: project.futureQuotes!.map(q => q.id === quote.id ? { ...q, link: e.target.value } : q) })}
+                     className="bg-[var(--bg)] border border-[var(--border)] p-1.5 rounded text-xs text-rose-400 outline-none focus:border-rose-400"
+                     placeholder="https://youtube.com/..."
+                   />
+                 </div>
+                 <button 
+                   onClick={() => updateProject({ futureQuotes: project.futureQuotes!.filter(q => q.id !== quote.id) })}
+                   className="absolute top-2 left-2 opacity-0 group-hover:opacity-100 text-red-500 hover:text-red-400 bg-[var(--bg)] rounded-full p-1"
+                 ><Trash2 size={12} /></button>
+               </div>
+             ))
+          )}
+        </div>
+
       </div>
     );
   };
 
   return (
     <div className="flex flex-col h-full bg-[var(--panel)]">
-      <div className="flex w-full border-b border-[var(--border)] p-2 gap-1 overflow-x-auto no-scrollbar justify-center">
-         <button onClick={() => setActiveTab('props')} title="خصائص" className={`p-2 rounded flex items-center justify-center gap-1 transition-colors ${activeTab==='props' ? 'bg-[var(--accent)] text-white' : 'text-[var(--text-dim)] hover:bg-[var(--bg)]'}`}><Settings size={18}/></button>
-         <button onClick={() => setActiveTab('chars')} title="شخصيات" className={`p-2 rounded flex items-center justify-center gap-1 transition-colors ${activeTab==='chars' ? 'bg-[var(--accent)] text-white' : 'text-[var(--text-dim)] hover:bg-[var(--bg)]'}`}><Users size={18}/></button>
-         <button onClick={() => setActiveTab('scenario')} title="سيناريو" className={`p-2 rounded flex items-center justify-center gap-1 transition-colors ${activeTab==='scenario' ? 'bg-[var(--accent)] text-white' : 'text-[var(--text-dim)] hover:bg-[var(--bg)]'}`}><FileText size={18}/></button>
-         <button onClick={() => setActiveTab('world')} title="العالم" className={`p-2 rounded flex items-center justify-center gap-1 transition-colors ${activeTab==='world' ? 'bg-[var(--accent)] text-white' : 'text-[var(--text-dim)] hover:bg-[var(--bg)]'}`}><BookOpen size={18}/></button>
-         <button onClick={() => setActiveTab('kanban')} title="تخطيط" className={`p-2 rounded flex items-center justify-center gap-1 transition-colors ${activeTab==='kanban' ? 'bg-[var(--accent)] text-white' : 'text-[var(--text-dim)] hover:bg-[var(--bg)]'}`}><KanbanSquare size={18}/></button>
-         <button onClick={() => setActiveTab('factions')} title="النقابات/الممالك" className={`p-2 rounded flex items-center justify-center gap-1 transition-colors ${activeTab==='factions' ? 'bg-[var(--accent)] text-white' : 'text-[var(--text-dim)] hover:bg-[var(--bg)]'}`}><Shield size={18}/></button>
-         <button onClick={() => setActiveTab('dict')} title="القاموس" className={`p-2 rounded flex items-center justify-center gap-1 transition-colors ${activeTab==='dict' ? 'bg-[var(--accent)] text-white' : 'text-[var(--text-dim)] hover:bg-[var(--bg)]'}`}><BookA size={18}/></button>
+      <div className="flex w-full border-b border-[var(--border)] p-1.5 gap-0.5 overflow-x-hidden justify-center items-center shrink-0">
+         <button onClick={() => setActiveTab('props')} title="خصائص" className={`p-1.5 rounded flex items-center justify-center transition-colors ${activeTab==='props' ? 'bg-[var(--accent)] text-white' : 'text-[var(--text-dim)] hover:bg-[var(--bg)]'}`}><Settings size={18}/></button>
+         <button onClick={() => setActiveTab('chars')} title="شخصيات" className={`p-1.5 rounded flex items-center justify-center transition-colors ${activeTab==='chars' ? 'bg-[var(--accent)] text-white' : 'text-[var(--text-dim)] hover:bg-[var(--bg)]'}`}><Users size={18}/></button>
+         <button onClick={() => setActiveTab('scenario')} title="سيناريو" className={`p-1.5 rounded flex items-center justify-center transition-colors ${activeTab==='scenario' ? 'bg-[var(--accent)] text-white' : 'text-[var(--text-dim)] hover:bg-[var(--bg)]'}`}><FileText size={18}/></button>
+         <button onClick={() => setActiveTab('world')} title="العالم" className={`p-1.5 rounded flex items-center justify-center transition-colors ${activeTab==='world' ? 'bg-[var(--accent)] text-white' : 'text-[var(--text-dim)] hover:bg-[var(--bg)]'}`}><BookOpen size={18}/></button>
+         <button onClick={() => setActiveTab('kanban')} title="تخطيط" className={`p-1.5 rounded flex items-center justify-center transition-colors ${activeTab==='kanban' ? 'bg-[var(--accent)] text-white' : 'text-[var(--text-dim)] hover:bg-[var(--bg)]'}`}><KanbanSquare size={18}/></button>
+         <button onClick={() => setActiveTab('factions')} title="النقابات/الممالك" className={`p-1.5 rounded flex items-center justify-center transition-colors ${activeTab==='factions' ? 'bg-[var(--accent)] text-white' : 'text-[var(--text-dim)] hover:bg-[var(--bg)]'}`}><Shield size={18}/></button>
+         <button onClick={() => setActiveTab('dict')} title="القاموس" className={`p-1.5 rounded flex items-center justify-center transition-colors ${activeTab==='dict' ? 'bg-[var(--accent)] text-white' : 'text-[var(--text-dim)] hover:bg-[var(--bg)]'}`}><BookA size={18}/></button>
+         
+         <div className="w-[1px] h-5 bg-[var(--border)] mx-0.5" />
+         
+         {onToggleExpand && (
+           <button 
+             onClick={onToggleExpand} 
+             title={isExpanded ? "تصغير" : "تكبير الشاشة"} 
+             className="p-1.5 rounded flex items-center transition-colors text-[var(--accent)] hover:bg-[var(--accent)] hover:text-white"
+           >
+             {isExpanded ? <ZoomOut size={18} /> : <ZoomIn size={18} />}
+           </button>
+         )}
       </div>
       
       <div className="flex-1 p-5 overflow-y-auto w-full max-h-full">

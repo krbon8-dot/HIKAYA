@@ -21,7 +21,7 @@ async function executeWithKeyRotation<T>(keys: string[], operation: (key: string
   return null;
 }
 
-export async function generateSuggestion(context: string, type: 'narrative' | 'dialogue' | 'proofread' | 'options' | 'plotholes', project?: ProjectData): Promise<string | null> {
+export async function generateSuggestion(context: string, type: 'narrative' | 'dialogue' | 'proofread' | 'options' | 'plotholes' | 'chat', project?: ProjectData): Promise<string | null> {
   try {
     const settingsStr = localStorage.getItem('hikaya_ai_settings');
     let apiKeys: string[] = [];
@@ -155,7 +155,7 @@ export async function editImageWithAI(imageUrl: string, prompt: string): Promise
           model: 'gemini-2.5-flash',
           contents: [
              commandPrompt,
-             { inline_data: { mime_type: 'image/jpeg', data: base64Image } }
+             { inlineData: { mimeType: 'image/jpeg', data: base64Image } }
           ],
           config: {
               temperature: 0.8
