@@ -40,6 +40,17 @@ export default function GraphicEditor({ block, updateBlock, deleteBlock }: Props
     });
   };
 
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        updateBlock({ imageUrl: reader.result as string });
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   return (
     <div className="relative group my-8 max-w-3xl mx-auto focus-within:z-10" dir="rtl">
       {/* Top Controls */}
@@ -229,13 +240,17 @@ export default function GraphicEditor({ block, updateBlock, deleteBlock }: Props
                     </div>
                  )}
 
-               <input 
-                  type="url"
-                  value={block.imageUrl || ''}
-                  onChange={e => updateBlock({ imageUrl: e.target.value })}
-                  placeholder="رابط صورة الخريطة..."
-                  className="absolute bottom-2 left-2 right-2 bg-black/80 border border-slate-700 outline-none text-xs text-slate-300 px-3 py-2 rounded opacity-0 group-hover/map:opacity-100 transition-opacity focus:opacity-100 text-center"
-               />
+                <label className="absolute inset-0 cursor-pointer opacity-0 group-hover/map:opacity-100 transition-opacity flex items-center justify-center bg-black/40">
+                   <div className="bg-slate-900 border border-slate-700 text-white px-4 py-2 rounded text-xs font-bold flex items-center gap-2">
+                      <Map size={14} /> {block.imageUrl ? "تغيير الخريطة" : "رفع خريطة"}
+                   </div>
+                   <input 
+                      type="file"
+                      accept="image/*"
+                      onChange={handleImageUpload}
+                      className="hidden"
+                   />
+                </label>
                
                {/* Crosshair target overlay */}
                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-8 h-8 pointer-events-none">
@@ -334,7 +349,7 @@ export default function GraphicEditor({ block, updateBlock, deleteBlock }: Props
                   <input 
                      value={(block.items && block.items[0]?.name) || ''}
                      onChange={e => {
-                        const newItems = [...(block.items || [{id: generateId(), name:'', desc:''}])];
+                        const newItems = block.items && block.items.length > 0 ? [...block.items] : [{id: generateId(), name:'', desc:''}];
                         newItems[0].name = e.target.value;
                         updateBlock({ items: newItems });
                      }}
@@ -375,13 +390,17 @@ export default function GraphicEditor({ block, updateBlock, deleteBlock }: Props
                ) : (
                   <Skull size={64} className="text-[#8b7355]" />
                )}
-               <input 
-                  type="url"
-                  value={block.imageUrl || ''}
-                  onChange={e => updateBlock({ imageUrl: e.target.value })}
-                  placeholder="رابط صورة المطلوب..."
-                  className="absolute bottom-2 left-2 right-2 bg-black/80 border border-slate-700 outline-none text-xs text-slate-300 px-3 py-2 rounded opacity-0 group-hover/wanted:opacity-100 transition-opacity focus:opacity-100 text-center"
-               />
+               <label className="absolute inset-0 cursor-pointer opacity-0 group-hover/wanted:opacity-100 transition-opacity flex items-center justify-center bg-black/40">
+                  <div className="bg-[#3a2818] text-[#e8dcb8] px-4 py-2 rounded text-xs font-bold flex items-center gap-2">
+                     <Skull size={14} /> {block.imageUrl ? "تغيير الصورة" : "رفع صورة المطلوب"}
+                  </div>
+                  <input 
+                     type="file"
+                     accept="image/*"
+                     onChange={handleImageUpload}
+                     className="hidden"
+                  />
+               </label>
             </div>
 
             <input 
@@ -407,7 +426,7 @@ export default function GraphicEditor({ block, updateBlock, deleteBlock }: Props
                <input 
                   value={(block.items && block.items[0]?.name) || ''}
                   onChange={e => {
-                     const newItems = [...(block.items || [{id: generateId(), name:'', desc:''}])];
+                     const newItems = block.items && block.items.length > 0 ? [...block.items] : [{id: generateId(), name:'', desc:''}];
                      newItems[0].name = e.target.value;
                      updateBlock({ items: newItems });
                   }}

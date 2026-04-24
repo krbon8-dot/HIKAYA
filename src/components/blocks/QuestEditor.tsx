@@ -1,6 +1,6 @@
 import React from 'react';
 import { QuestBlock, InventoryItem, RpgStat } from '../../types';
-import { Shield, Sparkles, Target, Trash2, CheckCircle2, Circle, Backpack, TrendingUp, Plus, Minus } from 'lucide-react';
+import { Shield, Sparkles, Target, Trash2, CheckCircle2, Circle, Backpack, TrendingUp, Plus, Minus, Heart, ArrowUpCircle, Award } from 'lucide-react';
 import { cn, generateId } from '../../lib/utils';
 
 interface Props {
@@ -41,6 +41,9 @@ export default function QuestEditor({ block, updateBlock, deleteBlock }: Props) 
                <option value="inventory" className="bg-slate-800 text-blue-400">INVENTORY & STATS (مخزون وقدرات)</option>
                <option value="choice" className="bg-slate-800 text-purple-400">DECISION (قرار وتصويت)</option>
                <option value="spell" className="bg-slate-800 text-emerald-400">SPELL / RITUAL (تعويذة وطقوس)</option>
+               <option value="healthbar" className="bg-slate-800 text-red-500">HEALTH BAR (شريط طاقة)</option>
+               <option value="levelup" className="bg-slate-800 text-yellow-400">LEVEL UP (ارتقاء مستوى)</option>
+               <option value="newskill" className="bg-slate-800 text-cyan-400">NEW SKILL (مهارة جديدة)</option>
             </select>
           </div>
         </div>
@@ -206,6 +209,94 @@ export default function QuestEditor({ block, updateBlock, deleteBlock }: Props) 
                 </div>
              </div>
            </div>
+         ) : mode === 'healthbar' ? (
+            <div className="flex flex-col gap-2 bg-[#1a1a1a] p-4 rounded-lg border border-red-900/30">
+               <div className="flex items-center justify-between mb-1">
+                  <div className="flex items-center gap-2">
+                     <Heart className="text-red-500" size={16} />
+                     <input 
+                        value={block.title}
+                        onChange={e => updateBlock({ title: e.target.value })}
+                        placeholder="HP / الصحة..."
+                        className="bg-transparent border-none outline-none font-bold text-red-500 text-sm uppercase tracking-widest w-32"
+                     />
+                  </div>
+                  <div className="flex gap-1 text-red-400 text-sm font-mono font-bold">
+                     <input 
+                        value={block.objective}
+                        onChange={e => updateBlock({ objective: e.target.value })}
+                        placeholder="45"
+                        className="bg-transparent border-none outline-none text-right w-12"
+                     />
+                     <span>/</span>
+                     <input 
+                        value={block.reward}
+                        onChange={e => updateBlock({ reward: e.target.value })}
+                        placeholder="100"
+                        className="bg-transparent border-none outline-none text-left w-12"
+                     />
+                  </div>
+               </div>
+               
+               <div className="h-4 w-full bg-slate-900 rounded-full overflow-hidden border border-red-900/50 shadow-inner">
+                  <div 
+                     className="h-full bg-gradient-to-r from-red-700 to-red-500 transition-all duration-500 relative"
+                     style={{ width: `${Math.min(100, Math.max(0, parseInt(block.objective) / (parseInt(block.reward) || 100) * 100))}%` }}
+                  >
+                     <div className="absolute inset-0 opacity-20" style={{ backgroundImage: 'linear-gradient(45deg, rgba(255,255,255,.15) 25%, transparent 25%, transparent 50%, rgba(255,255,255,.15) 50%, rgba(255,255,255,.15) 75%, transparent 75%, transparent)', backgroundSize: '1rem 1rem' }} />
+                  </div>
+               </div>
+            </div>
+         ) : mode === 'levelup' ? (
+            <div className="flex flex-col items-center justify-center p-8 bg-gradient-to-b from-[#b8860b]/20 to-transparent border-t-2 border-[#b8860b] rounded-t-lg relative overflow-hidden">
+               <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/stardust.png')] opacity-30 mix-blend-screen pointer-events-none" />
+               <ArrowUpCircle size={48} className="text-[#ffd700] mb-4 drop-shadow-[0_0_15px_rgba(255,215,0,0.8)] animate-pulse" />
+               <h2 className="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-b from-[#fffacd] to-[#daa520] tracking-[0.2em] uppercase drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)] mb-2">
+                  Level Up!
+               </h2>
+               <div className="flex items-center gap-2">
+                  <span className="text-[#b8860b] font-bold">المستوى الجديد:</span>
+                  <input 
+                     value={block.title}
+                     onChange={e => updateBlock({ title: e.target.value })}
+                     placeholder="مثال: 5"
+                     className="bg-transparent border-b border-[#b8860b]/50 outline-none text-2xl font-bold text-[#ffd700] text-center w-20 px-2"
+                  />
+               </div>
+               <textarea 
+                  value={block.description}
+                  onChange={e => {
+                     updateBlock({ description: e.target.value });
+                     e.target.style.height = 'auto';
+                     e.target.style.height = e.target.scrollHeight + 'px';
+                  }}
+                  placeholder="مكافآت المستوى... (+5 قوة، +2 سرعة)"
+                  className="bg-transparent border-none outline-none resize-none text-center text-[#eee8aa] mt-4 w-full text-sm"
+                  rows={2}
+               />
+            </div>
+         ) : mode === 'newskill' ? (
+            <div className="flex items-center gap-4 bg-[#0a192f] border border-[#64ffda]/30 p-4 rounded-xl shadow-[0_0_20px_rgba(100,255,218,0.1)] relative">
+               <div className="absolute left-0 top-0 w-1 h-full bg-[#64ffda] rounded-l-xl" />
+               <div className="w-12 h-12 rounded-lg bg-[#64ffda]/10 flex items-center justify-center shrink-0 border border-[#64ffda]/20">
+                  <Award size={24} className="text-[#64ffda]" />
+               </div>
+               <div className="flex flex-col flex-1">
+                  <span className="text-[10px] uppercase tracking-widest text-[#64ffda] font-bold mb-1">اكتسبت مهارة جديدة</span>
+                  <input 
+                     value={block.title}
+                     onChange={e => updateBlock({ title: e.target.value })}
+                     placeholder="اسم المهارة المعطاة..."
+                     className="bg-transparent border-none outline-none font-bold text-slate-100 text-lg w-full"
+                  />
+                  <input 
+                     value={block.description}
+                     onChange={e => updateBlock({ description: e.target.value })}
+                     placeholder="وصف مختصر للتأثير..."
+                     className="bg-transparent border-none outline-none text-xs text-slate-400 w-full mt-1"
+                  />
+               </div>
+            </div>
          ) : (
            <div className="flex flex-col gap-6">
               {/* Stats Section */}

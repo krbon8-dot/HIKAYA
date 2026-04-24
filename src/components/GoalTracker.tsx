@@ -11,16 +11,28 @@ interface GoalTrackerProps {
 
 const BADGES = [
   { id: 'start', title: 'خطوة الألف ميل', desc: 'كتابة أول حرف', target: 1, icon: '🌱', color: 'text-emerald-400' },
+  { id: '250', title: 'وميض فكرة', desc: '250 كلمة', target: 250, icon: '💡', color: 'text-yellow-200' },
   { id: '500', title: 'مقدمة مثيرة', desc: '500 كلمة', target: 500, icon: '🎭', color: 'text-indigo-400' },
+  { id: '750', title: 'نسج الخيوط', desc: '750 كلمة', target: 750, icon: '🧶', color: 'text-orange-300' },
   { id: '1k', title: 'بداية القصة', desc: '1,000 كلمة', target: 1000, icon: '📜', color: 'text-amber-500' },
+  { id: '1k5', title: 'بناء الشخصيات', desc: '1,500 كلمة', target: 1500, icon: '👥', color: 'text-pink-400' },
+  { id: '2k', title: 'تصاعد الأحداث', desc: '2,000 كلمة', target: 2000, icon: '🏔️', color: 'text-slate-300' },
   { id: '2k5', title: 'بناء العوالم', desc: '2,500 كلمة', target: 2500, icon: '🌍', color: 'text-cyan-400' },
+  { id: '3k5', title: 'عبير الكلمات', desc: '3,500 كلمة', target: 3500, icon: '🌸', color: 'text-rose-300' },
   { id: '5k', title: 'قلم واعد', desc: '5,000 كلمة', target: 5000, icon: '🖋️', color: 'text-blue-400' },
+  { id: '7k5', title: 'عمق الحبكة', desc: '7,500 كلمة', target: 7500, icon: '⚓', color: 'text-blue-600' },
   { id: '10k', title: 'حبكة متماسكة', desc: '10,000 كلمة', target: 10000, icon: '🔥', color: 'text-orange-500' },
+  { id: '12k5', title: 'سحر السرد', desc: '12,500 كلمة', target: 12500, icon: '🪄', color: 'text-purple-300' },
   { id: '15k', title: 'ذروة الأحداث', desc: '15,000 كلمة', target: 15000, icon: '⚡', color: 'text-yellow-300' },
+  { id: '17k5', title: 'صراع حاسم', desc: '17,500 كلمة', target: 17500, icon: '🗡️', color: 'text-red-400' },
+  { id: '20k', title: 'بحر الخيال', desc: '20,000 كلمة', target: 20000, icon: '🌊', color: 'text-blue-500' },
   { id: '25k', title: 'روائي محترف', desc: '25,000 كلمة', target: 25000, icon: '📖', color: 'text-purple-400' },
+  { id: '35k', title: 'أفق جديد', desc: '35,000 كلمة', target: 35000, icon: '🌌', color: 'text-indigo-500' },
   { id: '40k', title: 'نهاية قريبة', desc: '40,000 كلمة', target: 40000, icon: '⏳', color: 'text-rose-400' },
   { id: '50k', title: 'ملحمة أدبية', desc: '50,000 كلمة', target: 50000, icon: '👑', color: 'text-yellow-400' },
+  { id: '65k', title: 'إرث خالد', desc: '65,000 كلمة', target: 65000, icon: '🏛️', color: 'text-stone-400' },
   { id: '75k', title: 'كاتب مخضرم', desc: '75,000 كلمة', target: 75000, icon: '🌠', color: 'text-teal-400' },
+  { id: '85k', title: 'بريق الألماسة', desc: '85,000 كلمة', target: 85000, icon: '💎', color: 'text-blue-200' },
   { id: '100k', title: 'أسطورة أدبية', desc: '100,000 كلمة', target: 100000, icon: '🏆', color: 'text-yellow-500' },
 ];
 
@@ -198,7 +210,7 @@ export const GoalTracker: React.FC<GoalTrackerProps> = ({ project, updateProject
                    <h3 className="text-sm font-bold">أوسمة الإنجاز</h3>
                 </div>
                 
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
                   {BADGES.map(badge => {
                      const isUnlocked = wordCount >= badge.target;
                      return (

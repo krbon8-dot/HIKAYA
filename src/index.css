@@ -24,6 +24,16 @@
   }
 }
 
+.spell-error {
+  text-decoration: underline wavy #ef4444 2px;
+  text-underline-offset: 4px;
+  cursor: help;
+}
+
+.spell-error:hover {
+  background-color: rgba(239, 68, 68, 0.1);
+}
+
 /* Print styles to hide UI when exporting to PDF and ensure full content is printed */
 @media print {
   @page {

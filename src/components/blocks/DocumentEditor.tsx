@@ -1,6 +1,6 @@
 import React from 'react';
 import { DocumentBlock } from '../../types';
-import { Book, FileText, FolderLock, Quote, Eye, Timer, Trash2, Smartphone, Plus, AlignLeft, AlignRight, Terminal, Brain, MessageCircle } from 'lucide-react';
+import { Book, FileText, FolderLock, Quote, Eye, Timer, Trash2, Smartphone, Plus, AlignLeft, AlignRight, Terminal, Brain, MessageCircle, Sparkles } from 'lucide-react';
 import { cn, generateId } from '../../lib/utils';
 
 interface Props {
@@ -22,6 +22,7 @@ export default function DocumentEditor({ block, updateBlock, deleteBlock }: Prop
     { value: 'subtext', label: 'الظاهر والباطن', icon: Brain },
     { value: 'terminal', label: 'سجل الاختراق', icon: Terminal },
     { value: 'rumor', label: 'طاحونة الشائعات', icon: MessageCircle },
+    { value: 'prophecy', label: 'نبوءة مشفرة', icon: Sparkles },
   ];
 
   const CurrentIcon = options.find(o => o.value === block.docType)?.icon || FileText;
@@ -353,6 +354,39 @@ export default function DocumentEditor({ block, updateBlock, deleteBlock }: Prop
                     </div>
                  ))}
               </div>
+           </div>
+        )}
+
+        {/* CRYPTIC PROPHECY */}
+        {block.docType === 'prophecy' && (
+           <div className="bg-[#0f172a] text-cyan-400 p-8 border border-cyan-500/30 rounded-2xl shadow-[0_0_30px_rgba(6,182,212,0.15)] max-w-2xl mx-auto text-center relative overflow-hidden">
+              <div className="absolute inset-0 opacity-[0.03] pointer-events-none" style={{ backgroundImage: "url('data:image/svg+xml,%3Csvg width=\\'60\\' height=\\'60\\' viewBox=\\'0 0 60 60\\' xmlns=\\'http://www.w3.org/2000/svg\\'%3E%3Cg fill=\\'none\\' fill-rule=\\'evenodd\\'%3E%3Cg fill=\\'%2306b6d4\\' fill-opacity=\\'1\\'%3E%3Cpath d=\\'M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z\\'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E')" }} />
+              <div className="text-2xl font-bold tracking-[0.5em] mb-6 opacity-30 select-none text-cyan-500" style={{fontFamily: "monospace"}}>
+                 <input 
+                    value={block.title || '⍙☿▲⎍⍙'}
+                    onChange={e => updateBlock({ title: e.target.value })}
+                    className="bg-transparent border-none outline-none text-center w-full"
+                    placeholder="الرموز السرية..."
+                 />
+              </div>
+              <textarea 
+                 value={block.content}
+                 onChange={e => {
+                    updateBlock({ content: e.target.value });
+                    e.target.style.height = 'auto';
+                    e.target.style.height = e.target.scrollHeight + 'px';
+                 }}
+                 placeholder="نص النبوءة المشفرة..."
+                 className="w-full bg-transparent border-none outline-none resize-none text-lg text-cyan-100 placeholder:text-cyan-900/50 leading-loose text-center relative z-10"
+                 rows={4}
+                 style={{ textShadow: "0 0 10px rgba(6,182,212,0.5)" }}
+              />
+              <input 
+                 value={block.metadata || ''}
+                 onChange={e => updateBlock({ metadata: e.target.value })}
+                 placeholder="- المصدر أو التفسير..."
+                 className="mt-6 bg-transparent border-none outline-none text-center w-full text-xs text-cyan-700/70 relative z-10 uppercase tracking-widest"
+              />
            </div>
         )}
 

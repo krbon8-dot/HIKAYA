@@ -1,7 +1,9 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { TextBlock, ProjectData } from '../../types';
 import { cn } from '../../lib/utils';
-import { Bold, Italic, Underline, Baseline } from 'lucide-react';
+import { Bold, Italic, Underline, Baseline, Check, RotateCcw, Plus, Sparkles } from 'lucide-react';
+import { dictionaryService } from '../../services/dictionaryService';
+import { generateSuggestion } from '../../lib/aiService';
 
 interface Props {
   block: TextBlock;
@@ -14,6 +16,15 @@ export default function TextEditor({ block, project, onChange, onClick }: Props)
   const contentEditableRef = useRef<HTMLDivElement>(null);
   const [showColorPicker, setShowColorPicker] = useState(false);
   
+  // Spellcheck state
+  const [scMenu, setScMenu] = useState<{
+    visible: boolean;
+    word: string;
+    suggestions: string[];
+    top: number;
+    left: number;
+  }>({ visible: false, word: '', suggestions: [], top: 0, left: 0 });
+
   // Autocomplete state
   const [acState, setAcState] = useState<{
     visible: boolean;
@@ -34,6 +45,29 @@ export default function TextEditor({ block, project, onChange, onClick }: Props)
     }
   }, [block.content]);
 
+  const [isAiProofreading, setIsAiProofreading] = useState(false);
+
+  const handleAiProofread = async () => {
+    if (!contentEditableRef.current) return;
+    const text = contentEditableRef.current.innerText;
+    if (!text.trim()) return;
+
+    setIsAiProofreading(true);
+    try {
+      const fixed = await generateSuggestion(text, 'proofread', project);
+      if (fixed) {
+        // Convert plain text back to paragraphs/newlines if needed, or simply update content
+        const html = fixed.replace(/\n/g, '<br/>');
+        contentEditableRef.current.innerHTML = html;
+        onChange({ content: html });
+      }
+    } catch (err) {
+      console.error("AI Proofread failed", err);
+    } finally {
+      setIsAiProofreading(false);
+    }
+  };
+
   const handleInput = () => {
     if (contentEditableRef.current) {
       onChange({ content: contentEditableRef.current.innerHTML });
@@ -41,10 +75,59 @@ export default function TextEditor({ block, project, onChange, onClick }: Props)
     }
   };
 
+  const runSpellCheck = (html: string) => {
+    if (!html) return html;
+    
+    // 1. Remove existing spell-error spans to get clean text first
+    const cleanHtml = html.replace(/<span class="spell-error" data-word=".*?">(.*?)<\/span>/g, '$1');
+    
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(cleanHtml, 'text/html');
+    
+    const processNode = (node: Node) => {
+      if (node.nodeType === Node.TEXT_NODE) {
+        const text = node.textContent || '';
+        // Split by words but keep separators. Arabic words use space and common punctuation.
+        // Regex \s+ for whitespace, then various punctuation marks.
+        const words = text.split(/(\s+|[،.,!?;:()]+)/);
+        
+        let hasChange = false;
+        const wrapper = document.createElement('span');
+        
+        words.forEach(w => {
+          const clean = w.trim().replace(/[،.,!?;:()]/g, '');
+          if (clean && clean.length > 1 && !dictionaryService.isWordCorrect(clean)) {
+            const span = document.createElement('span');
+            span.className = 'spell-error';
+            span.dataset.word = clean;
+            span.textContent = w;
+            wrapper.appendChild(span);
+            hasChange = true;
+          } else {
+            wrapper.appendChild(document.createTextNode(w));
+          }
+        });
+        
+        if (hasChange) {
+           node.parentElement?.replaceChild(wrapper, node);
+        }
+      } else if (node.nodeType === Node.ELEMENT_NODE) {
+        const el = node as HTMLElement;
+        if (!el.classList.contains('entity-link')) {
+          Array.from(node.childNodes).forEach(processNode);
+        }
+      }
+    };
+    
+    Array.from(doc.body.childNodes).forEach(processNode);
+    return doc.body.innerHTML;
+  };
+
   const handleBlur = () => {
     if (contentEditableRef.current) {
       let html = contentEditableRef.current.innerHTML;
 
+      // 1. Lore links
       if (project && html) {
          const entities = [
            ...(project.characters || []).map(c => ({ name: c.name, type: 'char' })),
@@ -55,30 +138,75 @@ export default function TextEditor({ block, project, onChange, onClick }: Props)
          
          entities.sort((a,b) => b.name.length - a.name.length);
 
-         // We use a regex that matches the entity name ONLY if it is not inside an HTML tag.
-         // A negative lookahead for `(?![^<]*>)` ensures we are not inside a tag.
          let modifiedHtml = html;
-         
-         // Remove existing lore-links to replace them freshly if needed (optional, robust parsing is hard)
-         // So instead we just wrap unbound texts.
          entities.forEach(ent => {
              const safeName = ent.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
              const regex = new RegExp(`(${safeName})(?![^<]*>)(?!(?:[^<]*<\\/span>))`, 'g');
-             modifiedHtml = modifiedHtml.replace(regex, `<span class="text-blue-500 font-bold hover:underline cursor-help entity-link" data-name="$1" title="انقر لتفاصيل الموسوعة (سيظهر في الجانب)">$1</span>`);
+             modifiedHtml = modifiedHtml.replace(regex, `<span class="text-blue-500 font-bold hover:underline cursor-help entity-link" data-name="$1" title="انقر لتفاصيل الموسوعة">$1</span>`);
          });
-
-         if (modifiedHtml !== html) {
-             contentEditableRef.current.innerHTML = modifiedHtml;
-             html = modifiedHtml;
-         }
+         html = modifiedHtml;
       }
+
+      if (contentEditableRef.current.innerHTML !== html) {
+          contentEditableRef.current.innerHTML = html;
+      }
+      
       onChange({ content: html });
     }
     setTimeout(() => setAcState(s => ({ ...s, visible: false })), 200);
   };
 
+  const applyCorrection = (suggestion: string) => {
+    if (!contentEditableRef.current) return;
+    const html = contentEditableRef.current.innerHTML;
+    // Simple replacement of the span with the correct text
+    const regex = new RegExp(`<span class="spell-error" data-word="${scMenu.word}">.*?<\\/span>`, 'g');
+    const newHtml = html.replace(regex, suggestion);
+    contentEditableRef.current.innerHTML = newHtml;
+    onChange({ content: newHtml });
+    setScMenu(s => ({ ...s, visible: false }));
+  };
+
+  const ignoreWord = (word: string) => {
+    dictionaryService.ignoreWord(word);
+    if (!contentEditableRef.current) return;
+    const html = contentEditableRef.current.innerHTML;
+    const regex = new RegExp(`<span class="spell-error" data-word="${word}">(.*?)<\\/span>`, 'g');
+    const newHtml = html.replace(regex, '$1');
+    contentEditableRef.current.innerHTML = newHtml;
+    onChange({ content: newHtml });
+    setScMenu(s => ({ ...s, visible: false }));
+  };
+
+  const addWord = (word: string) => {
+    dictionaryService.addToDictionary(word);
+    ignoreWord(word);
+  };
+
   const handleSpanClick = (e: React.MouseEvent) => {
     const target = e.target as HTMLElement;
+    
+    // 1. Check for spell-error
+    if (target.classList.contains('spell-error')) {
+      const word = target.getAttribute('data-word') || '';
+      const rect = target.getBoundingClientRect();
+      const editorRect = contentEditableRef.current?.getBoundingClientRect();
+      
+      if (editorRect) {
+         setScMenu({
+           visible: true,
+           word,
+           suggestions: dictionaryService.getSuggestions(word),
+           top: rect.bottom - editorRect.top + 5,
+           left: rect.left - editorRect.left,
+         });
+         return;
+      }
+    } else {
+      setScMenu(s => ({ ...s, visible: false }));
+    }
+
+    // 2. Check for entity-link
     if (target.classList.contains('entity-link')) {
       const name = target.getAttribute('data-name');
       if (name) {
@@ -267,6 +395,21 @@ export default function TextEditor({ block, project, onChange, onClick }: Props)
              </div>
            )}
         </div>
+
+        <div className="w-px h-4 bg-[var(--border)] mx-1" />
+
+        <button 
+          onMouseDown={(e) => { e.preventDefault(); handleAiProofread(); }} 
+          disabled={isAiProofreading}
+          className={cn(
+            "p-1.5 hover:bg-[#2a2a2a] rounded text-[var(--text)] transition-colors flex items-center gap-1.5",
+            isAiProofreading && "animate-pulse text-emerald-400"
+          )}
+          title="تدقيق ذكي بالذكاء الاصطناعي (مثل قوقل/وورد)"
+        >
+          <Sparkles size={16} className={isAiProofreading ? "animate-spin" : "text-emerald-500"} />
+          <span className="text-[10px] font-bold">{isAiProofreading ? "جاري..." : "تدقيق ذكي"}</span>
+        </button>
       </div>
 
       {/* Editor Area */}
@@ -274,8 +417,9 @@ export default function TextEditor({ block, project, onChange, onClick }: Props)
           <div
             ref={contentEditableRef}
             contentEditable
+            spellCheck="true"
             onInput={handleInput}
-            onBlur={() => { handleInput(); setTimeout(() => setAcState(s => ({ ...s, visible: false })), 200); }}
+            onBlur={handleBlur}
             onKeyDown={handleKeyDown}
             suppressContentEditableWarning
             data-placeholder="اكتب هنا وقم بتظليل النص للتنسيق..."
@@ -320,6 +464,55 @@ export default function TextEditor({ block, project, onChange, onClick }: Props)
                      {opt}
                    </button>
                 ))}
+             </div>
+          )}
+
+          {/* Spellcheck Menu */}
+          {scMenu.visible && (
+             <div 
+               className="absolute z-[70] bg-[var(--panel)] border border-[var(--border)] shadow-2xl rounded-lg overflow-hidden flex flex-col w-52 text-sm animate-in fade-in zoom-in-95"
+               style={{ top: `${scMenu.top}px`, left: `${scMenu.left}px` }}
+             >
+                <div className="bg-red-500/10 px-3 py-2 text-xs text-red-500 font-bold border-b border-[var(--border)] flex items-center justify-between">
+                  <span>تدقيق: {scMenu.word}</span>
+                  <button onMouseDown={(e) => { e.preventDefault(); setScMenu(s => ({ ...s, visible: false })); }} className="text-[var(--text-dim)]">✕</button>
+                </div>
+                
+                {scMenu.suggestions.length > 0 ? (
+                   <div className="flex flex-col border-b border-[var(--border)]">
+                      {scMenu.suggestions.map(s => (
+                         <button
+                           key={s}
+                           onMouseDown={(e) => { e.preventDefault(); applyCorrection(s); }}
+                           className="px-3 py-2 text-right hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors flex items-center justify-between"
+                         >
+                            <Check size={14} className="text-emerald-500" />
+                            <span>{s}</span>
+                         </button>
+                      ))}
+                   </div>
+                ) : (
+                   <div className="px-3 py-3 text-center text-[var(--text-dim)] italic border-b border-[var(--border)] text-xs">
+                      لا توجد اقتراحات قريبة
+                   </div>
+                )}
+                
+                <div className="flex flex-col bg-slate-50 dark:bg-black/20">
+                   <button 
+                     onMouseDown={(e) => { e.preventDefault(); ignoreWord(scMenu.word); }}
+                     className="px-3 py-2 text-right hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors flex items-center justify-between text-xs"
+                   >
+                      <RotateCcw size={12} className="text-slate-400" />
+                      <span>تجاهل الكل</span>
+                   </button>
+                   <button 
+                     onMouseDown={(e) => { e.preventDefault(); addWord(scMenu.word); }}
+                     className="px-3 py-2 text-right hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors flex items-center justify-between text-xs"
+                   >
+                      <Plus size={12} className="text-emerald-500" />
+                      <span>إضافة للقاموس</span>
+                   </button>
+                </div>
              </div>
           )}
       </div>

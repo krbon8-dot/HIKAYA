@@ -1,4 +1,4 @@
-export type BlockType = 'text' | 'image' | 'dialogue' | 'table' | 'divider' | 'callout' | 'chat' | 'quest' | 'document' | 'graphic';
+export type BlockType = 'text' | 'image' | 'dialogue' | 'table' | 'divider' | 'callout' | 'chat' | 'quest' | 'document' | 'graphic' | 'sfx';
 
 export interface BaseBlock {
   id: string;
@@ -36,7 +36,7 @@ export interface RpgStat {
 
 export interface QuestBlock extends BaseBlock {
   type: 'quest';
-  mode?: 'quest' | 'inventory' | 'choice' | 'spell';
+  mode?: 'quest' | 'inventory' | 'choice' | 'spell' | 'healthbar' | 'levelup' | 'newskill';
   title: string;
   description: string;
   objective: string;
@@ -49,7 +49,7 @@ export interface QuestBlock extends BaseBlock {
 
 export interface DocumentBlock extends BaseBlock {
   type: 'document';
-  docType: 'journal' | 'newspaper' | 'dossier' | 'epigraph' | 'vision' | 'timer' | 'chat' | 'subtext' | 'terminal' | 'rumor';
+  docType: 'journal' | 'newspaper' | 'dossier' | 'epigraph' | 'vision' | 'timer' | 'chat' | 'subtext' | 'terminal' | 'rumor' | 'prophecy';
   docStyle?: string;
   title?: string;
   content: string;
@@ -121,6 +121,14 @@ export interface CalloutBlock extends BaseBlock {
 
 export type GraphicType = 'evidence' | 'lineage' | 'scroll' | 'minimap' | 'journey' | 'atmosphere' | 'wanted';
 
+export interface SfxBlock extends BaseBlock {
+  type: 'sfx';
+  sfxType: 'word' | 'symbol';
+  text: string;
+  colorStyle: string;
+  align: 'left' | 'center' | 'right';
+}
+
 export interface GraphicBlock extends BaseBlock {
   type: 'graphic';
   graphicType: GraphicType;
@@ -130,7 +138,7 @@ export interface GraphicBlock extends BaseBlock {
   items?: any[];
 }
 
-export type StoryBlock = TextBlock | ImageBlock | DialogueBlock | TableBlock | DividerBlock | CalloutBlock | ChatBlock | QuestBlock | DocumentBlock | GraphicBlock;
+export type StoryBlock = TextBlock | ImageBlock | DialogueBlock | TableBlock | DividerBlock | CalloutBlock | ChatBlock | QuestBlock | DocumentBlock | GraphicBlock | SfxBlock;
 
 export interface Chapter {
   id: string;

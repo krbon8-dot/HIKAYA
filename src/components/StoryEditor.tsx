@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import localforage from 'localforage';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
-import { Type, ImageIcon, MessageSquare, GripVertical, Trash2, Save, Printer, Plus, ChevronLeft, ChevronRight, FilePlus, FolderClock, X, Loader2, Focus, Grid, Cloud, LogOut, User as UserIcon, Sparkles, Send, Square, LayoutTemplate, Minus, HelpCircle, Music, Search, Download, Columns, Smartphone, Target, Clock, Network } from 'lucide-react';
+import { Type, ImageIcon, MessageSquare, GripVertical, Trash2, Save, Printer, Plus, ChevronLeft, ChevronRight, FilePlus, FolderClock, X, Loader2, Focus, Grid, Cloud, LogOut, User as UserIcon, Sparkles, Send, Square, LayoutTemplate, Minus, HelpCircle, Music, Search, Download, Columns, Smartphone, Target, Clock, Network, Zap } from 'lucide-react';
 import { StoryBlock, ProjectData, ProjectPage, Character } from '../types';
 import { generateId, cn } from '../lib/utils';
 import TextEditor from './blocks/TextEditor';
@@ -14,6 +14,7 @@ import ChatEditor from './blocks/ChatEditor';
 import QuestEditor from './blocks/QuestEditor';
 import DocumentEditor from './blocks/DocumentEditor';
 import GraphicEditor from './blocks/GraphicEditor';
+import SfxEditor from './blocks/SfxEditor';
 import PropertiesPanel from './PropertiesPanel';
 import AISettingsModal from './AISettingsModal';
 import { MusicPlayer } from './MusicPlayer';
@@ -341,6 +342,11 @@ export default function StoryEditor() {
       newBlock.graphicType = 'evidence';
       newBlock.title = '';
       newBlock.items = [];
+    } else if (type === 'sfx') {
+      newBlock.sfxType = 'word';
+      newBlock.text = 'صدمة!';
+      newBlock.colorStyle = 'red';
+      newBlock.align = 'center';
     }
     updatePageBlocks([...blocks, newBlock]);
     setSelectedBlockId(newBlock.id);
@@ -454,6 +460,7 @@ export default function StoryEditor() {
       case 'quest': return <QuestEditor block={block as any} updateBlock={(u) => updateBlock(block.id, u)} deleteBlock={() => deleteBlock(block.id)} />;
       case 'document': return <DocumentEditor block={block as any} updateBlock={(u) => updateBlock(block.id, u)} deleteBlock={() => deleteBlock(block.id)} />;
       case 'graphic': return <GraphicEditor block={block as any} updateBlock={(u) => updateBlock(block.id, u)} deleteBlock={() => deleteBlock(block.id)} />;
+      case 'sfx': return <SfxEditor block={block as any} onChange={(u) => updateBlock(block.id, u)} onClick={() => setSelectedBlockId(block.id)} />;
       default: return null;
     }
   };
@@ -845,10 +852,11 @@ export default function StoryEditor() {
 
               {/* Structure Blocks Merged */}
               <div className="relative group/layout flex justify-center w-full">
-                 <button className="w-10 h-10 rounded-lg flex items-center justify-center text-[var(--text-dim)] hover:bg-[rgba(168,85,247,0.15)] hover:text-[var(--accent)] transition-all w-full" title="تنسيقات هيكلية (جدول، فاصل، مربع)">
+                 <button className="w-10 h-10 rounded-lg flex items-center justify-center text-[var(--text-dim)] hover:bg-[rgba(168,85,247,0.15)] hover:text-[var(--accent)] transition-all w-full" title="تنسيقات ومؤثرات (جدول، فاصل، مربع، تعابير)">
                     <LayoutTemplate size={22} className="group-active/layout:scale-95 transition-transform" />
                  </button>
                  <div className="absolute top-0 right-full mr-2 bg-[var(--panel)] border border-[var(--border)] rounded-lg shadow-xl opacity-0 invisible group-hover/layout:opacity-100 group-hover/layout:visible flex-col overflow-hidden w-40 z-50 transition-all duration-200 flex">
+                    <button onClick={() => addBlock('sfx')} className="px-3 py-2.5 text-sm text-[var(--text)] hover:bg-[var(--bg)] hover:text-[var(--accent)] flex items-center gap-2 border-b border-[var(--border)] transition-colors"><Zap size={16} /> مؤثرات وتعابير</button>
                     <button onClick={() => addBlock('table')} className="px-3 py-2.5 text-sm text-[var(--text)] hover:bg-[var(--bg)] hover:text-[var(--accent)] flex items-center gap-2 border-b border-[var(--border)] transition-colors"><Columns size={16} /> جدول قراءة</button>
                     <button onClick={() => addBlock('divider')} className="px-3 py-2.5 text-sm text-[var(--text)] hover:bg-[var(--bg)] hover:text-[var(--accent)] flex items-center gap-2 border-b border-[var(--border)] transition-colors"><Minus size={16} /> خط فاصل</button>
                     <button onClick={() => addBlock('callout')} className="px-3 py-2.5 text-sm text-[var(--text)] hover:bg-[var(--bg)] hover:text-[var(--accent)] flex items-center gap-2 transition-colors"><Square size={16} /> مربع منسق</button>
