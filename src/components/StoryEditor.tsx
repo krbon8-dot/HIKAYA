@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import localforage from 'localforage';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
-import { Type, ImageIcon, MessageSquare, GripVertical, Trash2, Save, Printer, Plus, ChevronLeft, ChevronRight, FilePlus, FolderClock, X, Loader2, Focus, Grid, Cloud, LogOut, User as UserIcon, Sparkles, Send, Square, LayoutTemplate, Minus, HelpCircle, Music } from 'lucide-react';
-import { StoryBlock, ProjectData, ProjectPage } from '../types';
+import { Type, ImageIcon, MessageSquare, GripVertical, Trash2, Save, Printer, Plus, ChevronLeft, ChevronRight, FilePlus, FolderClock, X, Loader2, Focus, Grid, Cloud, LogOut, User as UserIcon, Sparkles, Send, Square, LayoutTemplate, Minus, HelpCircle, Music, Search, Download, Columns, Smartphone, Target, Clock, Network } from 'lucide-react';
+import { StoryBlock, ProjectData, ProjectPage, Character } from '../types';
 import { generateId, cn } from '../lib/utils';
 import TextEditor from './blocks/TextEditor';
 import ImageEditor from './blocks/ImageEditor';
@@ -10,9 +10,20 @@ import DialogueEditor from './blocks/DialogueEditor';
 import TableEditor from './blocks/TableEditor';
 import DividerEditor from './blocks/DividerEditor';
 import CalloutEditor from './blocks/CalloutEditor';
+import ChatEditor from './blocks/ChatEditor';
+import QuestEditor from './blocks/QuestEditor';
+import DocumentEditor from './blocks/DocumentEditor';
+import GraphicEditor from './blocks/GraphicEditor';
 import PropertiesPanel from './PropertiesPanel';
 import AISettingsModal from './AISettingsModal';
 import { MusicPlayer } from './MusicPlayer';
+import { GoalTracker } from './GoalTracker';
+import { ExportModal } from './ExportModal';
+import { FindReplaceModal } from './FindReplaceModal';
+import { AccessibilityModal } from './AccessibilityModal';
+import { RelationshipModal } from './RelationshipModal';
+import { TimelineModal } from './TimelineModal';
+import { Monitor } from 'lucide-react';
 
 const LOCAL_STORAGE_KEY = 'hikaya-projects-v3';
 
@@ -81,6 +92,9 @@ export default function StoryEditor() {
   const [isChatting, setIsChatting] = useState(false);
 
   const [printType, setPrintType] = useState<'none' | 'current' | 'all'>('none');
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [showFindReplaceModal, setShowFindReplaceModal] = useState(false);
+  const [isSplitScreen, setIsSplitScreen] = useState(false);
   const [toastMsg, setToastMsg] = useState('');
   const [confirmDialog, setConfirmDialog] = useState<{msg: string, action: () => void} | null>(null);
 
@@ -88,11 +102,45 @@ export default function StoryEditor() {
   const [isFocusMode, setIsFocusMode] = useState(false);
   const [showGrid, setShowGrid] = useState(false);
   const [isPanelExpanded, setIsPanelExpanded] = useState(false);
+
+  // External Views
+  const [showTimelineModal, setShowTimelineModal] = useState(false);
+  const [showRelationshipModal, setShowRelationshipModal] = useState(false);
   
   // Undo/Redo tracking
   const [history, setHistory] = useState<ProjectData[]>([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
   const [isUndoRedoing, setIsUndoRedoing] = useState(false);
+
+  // Accessibility
+  const [showA11yModal, setShowA11yModal] = useState(false);
+  const [uiScale, setUiScale] = useState(16);
+  const [a11yMode, setA11yMode] = useState(false);
+  const [editorZoom, setEditorZoom] = useState(1);
+
+  // Load A11y settings
+  useEffect(() => {
+    const saved = localStorage.getItem('hikaya-a11y');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (parsed.uiScale) setUiScale(parsed.uiScale);
+        if (parsed.a11yMode) setA11yMode(parsed.a11yMode);
+        if (parsed.editorZoom) setEditorZoom(parsed.editorZoom);
+      } catch (e) {}
+    }
+  }, []);
+
+  // Sync A11y state with body & localstorage
+  useEffect(() => {
+    document.documentElement.style.fontSize = `${uiScale}px`;
+    if (a11yMode) {
+      document.body.classList.add('a11y-mode');
+    } else {
+      document.body.classList.remove('a11y-mode');
+    }
+    localStorage.setItem('hikaya-a11y', JSON.stringify({ uiScale, a11yMode, editorZoom }));
+  }, [uiScale, a11yMode, editorZoom]);
 
   const showToast = (msg: string) => {
     setToastMsg(msg);
@@ -123,8 +171,25 @@ export default function StoryEditor() {
     }
   };
 
-  // Setup undo/redo hotkeys
+  // Setup undo/redo hotkeys and global custom events
   useEffect(() => {
+    const handleRoleplay = (e: any) => {
+      const charId = e.detail.characterId;
+      const char = project?.characters?.find(c => c.id === charId);
+      if (char) {
+        setChatMessages([
+          { 
+            role: 'ai', 
+            content: `أنا الآن متقمص لشخصية "${char.name}". تفضل بطرح أسئلتك لتختبر ردودي كأنني أنا هو حقاً، بناءً على صفاتي في القصة!` 
+          }
+        ]);
+        setChatInput(`/roleplay ${charId} `);
+        setShowChatModal(true);
+      }
+    };
+
+    window.addEventListener('start-roleplay', handleRoleplay);
+
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
         e.preventDefault();
@@ -150,8 +215,11 @@ export default function StoryEditor() {
       }
     };
     window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [history, historyIndex, projects]);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('start-roleplay', handleRoleplay);
+    };
+  }, [history, historyIndex, projects, project?.characters]);
 
   const handleSave = async () => {
     try {
@@ -251,6 +319,28 @@ export default function StoryEditor() {
     } else if (type === 'callout') {
       newBlock.content = 'نص توضيحي أو تذكر...';
       newBlock.calloutType = 'note';
+    } else if (type === 'chat') {
+      newBlock.messages = [];
+      newBlock.title = 'محادثة جديدة';
+    } else if (type === 'quest') {
+      newBlock.title = 'مهمة جديدة';
+      newBlock.description = 'وصف المهمة...';
+      newBlock.objective = 'الهدف:';
+      newBlock.reward = 'المكافأة:';
+      newBlock.status = 'new';
+      newBlock.mode = 'quest';
+      newBlock.choices = [{ id: generateId(), text: 'الخيار الأول' }, { id: generateId(), text: 'الخيار الثاني' }];
+      newBlock.inventory = [];
+      newBlock.stats = [];
+    } else if (type === 'document') {
+      newBlock.docType = 'newspaper';
+      newBlock.title = '';
+      newBlock.content = '';
+      newBlock.metadata = '';
+    } else if (type === 'graphic') {
+      newBlock.graphicType = 'evidence';
+      newBlock.title = '';
+      newBlock.items = [];
     }
     updatePageBlocks([...blocks, newBlock]);
     setSelectedBlockId(newBlock.id);
@@ -360,6 +450,10 @@ export default function StoryEditor() {
       case 'table': return <TableEditor block={block as any} onChange={(u) => updateBlock(block.id, u)} onClick={() => setSelectedBlockId(block.id)} />;
       case 'divider': return <DividerEditor block={block as any} onChange={(u) => updateBlock(block.id, u)} onClick={() => setSelectedBlockId(block.id)} />;
       case 'callout': return <CalloutEditor block={block as any} onChange={(u) => updateBlock(block.id, u)} onClick={() => setSelectedBlockId(block.id)} />;
+      case 'chat': return <ChatEditor block={block as any} updateBlock={(u) => updateBlock(block.id, u)} deleteBlock={() => deleteBlock(block.id)} />;
+      case 'quest': return <QuestEditor block={block as any} updateBlock={(u) => updateBlock(block.id, u)} deleteBlock={() => deleteBlock(block.id)} />;
+      case 'document': return <DocumentEditor block={block as any} updateBlock={(u) => updateBlock(block.id, u)} deleteBlock={() => deleteBlock(block.id)} />;
+      case 'graphic': return <GraphicEditor block={block as any} updateBlock={(u) => updateBlock(block.id, u)} deleteBlock={() => deleteBlock(block.id)} />;
       default: return null;
     }
   };
@@ -570,7 +664,7 @@ export default function StoryEditor() {
             />
 
             <button onClick={() => setShowProjectsModal(true)} className="flex items-center gap-2 bg-[#252525] hover:bg-[#333] border border-[var(--border)] px-3 py-1.5 rounded transition-colors text-xs font-bold text-[var(--text)]">
-              <FolderClock size={16} /> <span className="hidden sm:inline">مشاريعي</span>
+              <FolderClock size={16} title="مشاريعي" />
             </button>
           </div>
 
@@ -634,6 +728,14 @@ export default function StoryEditor() {
             <div className="w-px h-6 bg-[var(--border)] mx-1 hidden lg:block" />
 
             <button 
+              onClick={() => setShowA11yModal(true)} 
+              className={cn("p-1.5 bg-transparent border rounded transition-colors flex items-center justify-center", (uiScale !== 16 || a11yMode || editorZoom !== 1) ? "border-emerald-500/50 text-emerald-400 bg-emerald-500/10" : "border-[var(--border)] hover:bg-[#2a2a2a] text-[var(--text)]")}
+              title="إعدادات الرؤية وسهولة الوصول"
+            >
+              <Monitor size={16} />
+            </button>
+
+            <button 
               onClick={() => setShowSettingsModal(true)} 
               className="p-1.5 bg-transparent text-[var(--accent)] hover:bg-[rgba(168,85,247,0.1)] rounded transition-colors"
               title="إعدادات الذكاء الاصطناعي"
@@ -646,6 +748,36 @@ export default function StoryEditor() {
                title="مساعد الكاتب (AI)"
             >
               <MessageSquare size={16} />
+            </button>
+            <button 
+               onClick={() => setShowTimelineModal(true)}
+               className="p-1.5 bg-transparent hover:bg-emerald-500/10 text-emerald-500 rounded transition-colors hidden md:block"
+               title="الخط الزمني المتشابك"
+            >
+              <Clock size={16} />
+            </button>
+            <button 
+               onClick={() => setShowRelationshipModal(true)}
+               className="p-1.5 bg-transparent hover:bg-purple-500/10 text-purple-500 rounded transition-colors hidden md:block"
+               title="شبكة العلاقات"
+            >
+              <Network size={16} />
+            </button>
+            <GoalTracker project={project} updateProject={updateProject} />
+            <div className="w-px h-6 bg-[var(--border)] mx-1 hidden lg:block" />
+            <button
+              onClick={() => setIsSplitScreen(!isSplitScreen)}
+              className={cn("p-1.5 border rounded transition-colors flex items-center justify-center", isSplitScreen ? "bg-[var(--accent)] border-[var(--accent)] text-white" : "bg-transparent border-[var(--border)] hover:bg-[#2a2a2a] text-[var(--text)]")}
+              title="تقسيم الشاشة (المرجع والمسودة)"
+            >
+              <Columns size={16} />
+            </button>
+            <button
+              onClick={() => setShowFindReplaceModal(true)}
+              className="p-1.5 bg-transparent border border-[var(--border)] hover:bg-[#2a2a2a] text-[var(--text)] rounded transition-colors"
+              title="البحث والاستبدال"
+            >
+              <Search size={16} />
             </button>
             <button
               onClick={() => setShowHelpModal(true)}
@@ -674,8 +806,11 @@ export default function StoryEditor() {
             <button onClick={handleSave} title="حفظ مجمل" className="px-3 py-1.5 bg-transparent border border-[var(--border)] hover:bg-[#2a2a2a] rounded text-[var(--text)] transition-colors flex items-center justify-center">
               <Save size={16} />
             </button>
-            <button onClick={() => setShowPrintModal(true)} title="طباعة" className="px-3 py-1.5 bg-[var(--accent)] border border-[var(--accent)] hover:bg-purple-600 rounded text-white transition-colors flex items-center justify-center">
+            <button onClick={() => setShowPrintModal(true)} title="طباعة" className="px-3 py-1.5 bg-transparent border border-[var(--border)] hover:bg-[#2a2a2a] rounded text-[var(--text)] transition-colors flex items-center justify-center">
               <Printer size={16} />
+            </button>
+            <button onClick={() => setShowExportModal(true)} title="تصدير (Word/EPUB)" className="px-3 py-1.5 bg-[var(--accent)] border border-[var(--accent)] hover:bg-purple-600 rounded text-white transition-colors flex items-center justify-center">
+              <Download size={16} />
             </button>
           </div>
       </header>
@@ -695,29 +830,54 @@ export default function StoryEditor() {
               <button onClick={() => addBlock('dialogue')} className="w-10 h-10 rounded-lg flex items-center justify-center text-[var(--text-dim)] hover:bg-[rgba(168,85,247,0.15)] hover:text-[var(--accent)] transition-all group relative" title="إضافة حوار">
                 <MessageSquare size={22} className="group-active:scale-95 transition-transform" />
               </button>
+
+              {/* Document Block */}
+              <button onClick={() => addBlock('document')} className="w-10 h-10 rounded-lg flex items-center justify-center text-[var(--text-dim)] hover:bg-[rgba(168,85,247,0.15)] hover:text-[var(--accent)] transition-all group relative" title="يوميات / قصاصات / وثائق">
+                <FilePlus size={22} className="group-active:scale-95 transition-transform" />
+              </button>
+
+              {/* Graphic Block */}
+              <button onClick={() => addBlock('graphic')} className="w-10 h-10 rounded-lg flex items-center justify-center text-[var(--text-dim)] hover:bg-[rgba(168,85,247,0.15)] hover:text-[var(--accent)] transition-all group relative" title="رسومات / لوحة تحقيق / شجرة عائلة / خريطةمصغرة">
+                <Network size={22} className="group-active:scale-95 transition-transform" />
+              </button>
+
               <div className="w-6 h-px bg-[var(--border)] my-1" />
-              <button onClick={() => addBlock('table')} className="w-10 h-10 rounded-lg flex items-center justify-center text-[var(--text-dim)] hover:bg-[rgba(168,85,247,0.15)] hover:text-[var(--accent)] transition-all group relative" title="إضافة جدول">
-                <LayoutTemplate size={22} className="group-active:scale-95 transition-transform" />
-              </button>
-              <button onClick={() => addBlock('divider')} className="w-10 h-10 rounded-lg flex items-center justify-center text-[var(--text-dim)] hover:bg-[rgba(168,85,247,0.15)] hover:text-[var(--accent)] transition-all group relative" title="إضافة خط فاصل">
-                <Minus size={22} className="group-active:scale-95 transition-transform" />
-              </button>
-              <button onClick={() => addBlock('callout')} className="w-10 h-10 rounded-lg flex items-center justify-center text-[var(--text-dim)] hover:bg-[rgba(168,85,247,0.15)] hover:text-[var(--accent)] transition-all group relative" title="إضافة مربع منسق">
-                <Square size={22} className="group-active:scale-95 transition-transform" />
+
+              {/* Structure Blocks Merged */}
+              <div className="relative group/layout flex justify-center w-full">
+                 <button className="w-10 h-10 rounded-lg flex items-center justify-center text-[var(--text-dim)] hover:bg-[rgba(168,85,247,0.15)] hover:text-[var(--accent)] transition-all w-full" title="تنسيقات هيكلية (جدول، فاصل، مربع)">
+                    <LayoutTemplate size={22} className="group-active/layout:scale-95 transition-transform" />
+                 </button>
+                 <div className="absolute top-0 right-full mr-2 bg-[var(--panel)] border border-[var(--border)] rounded-lg shadow-xl opacity-0 invisible group-hover/layout:opacity-100 group-hover/layout:visible flex-col overflow-hidden w-40 z-50 transition-all duration-200 flex">
+                    <button onClick={() => addBlock('table')} className="px-3 py-2.5 text-sm text-[var(--text)] hover:bg-[var(--bg)] hover:text-[var(--accent)] flex items-center gap-2 border-b border-[var(--border)] transition-colors"><Columns size={16} /> جدول قراءة</button>
+                    <button onClick={() => addBlock('divider')} className="px-3 py-2.5 text-sm text-[var(--text)] hover:bg-[var(--bg)] hover:text-[var(--accent)] flex items-center gap-2 border-b border-[var(--border)] transition-colors"><Minus size={16} /> خط فاصل</button>
+                    <button onClick={() => addBlock('callout')} className="px-3 py-2.5 text-sm text-[var(--text)] hover:bg-[var(--bg)] hover:text-[var(--accent)] flex items-center gap-2 transition-colors"><Square size={16} /> مربع منسق</button>
+                 </div>
+              </div>
+
+              <div className="w-6 h-px bg-[var(--border)] my-1" />
+
+              <button onClick={() => addBlock('quest')} className="w-10 h-10 rounded-lg flex items-center justify-center text-[var(--text-dim)] hover:bg-[rgba(168,85,247,0.15)] hover:text-[var(--accent)] transition-all group relative" title="كويست / مخزون / قدرات">
+                <Target size={22} className="group-active:scale-95 transition-transform" />
               </button>
           </aside>
         )}
 
-        {/* Center Canvas Area relative parent to handle scrolling correctly */}
-        <section 
-          className="flex-1 overflow-y-auto print:block print:h-auto print:overflow-visible bg-[#0f0f0f] print:bg-white relative flex justify-center p-4 print:p-0" 
-          onClick={(e) => { if(e.target === e.currentTarget) setSelectedBlockId(null) }}
-        >
-          {/* Main story container */}
+        {/* Viewport for Center Editor & Optional Split Screen */}
+        <div className="flex-1 flex overflow-hidden">
+          
+          {/* Main Editor Canvas */}
+          <section 
+            className="flex-1 overflow-y-auto print:block print:h-auto print:overflow-visible bg-[#0f0f0f] print:bg-white relative flex justify-center p-4 print:p-0" 
+            onClick={(e) => { if(e.target === e.currentTarget) setSelectedBlockId(null) }}
+          >
+            {/* Main story container */}
           <div 
             className="w-full text-black shadow-[0_0_40px_rgba(0,0,0,0.5)] flex flex-col h-fit min-h-full story-container transition-all duration-300 relative print:max-w-none print:w-full print:shadow-none bg-white"
             style={{ 
               backgroundColor: project.backgroundColor,
+              transform: `scale(${editorZoom})`,
+              transformOrigin: 'top center',
               maxWidth: 
                 project.pageFormat === 'A4' ? '210mm' : 
                 project.pageFormat === 'A5' ? '148mm' : 
@@ -833,7 +993,33 @@ export default function StoryEditor() {
             )}
             </div>
           </div>
-        </section>
+          </section>
+
+          {/* Optional Split Screen Reference Panel */}
+          {isSplitScreen && (
+            <section className="w-1/2 border-r border-[#333] bg-[#1a1a1a] flex flex-col overflow-hidden animate-in slide-in-from-right no-print">
+              <div className="p-4 bg-black/40 border-b border-[#333] flex justify-between items-center">
+                <h3 className="font-bold text-[var(--accent)] font-serif text-lg">شاشة المرجع (Reference)</h3>
+                <button onClick={() => setIsSplitScreen(false)} className="text-[var(--text-dim)] hover:text-white">
+                  <X size={18} />
+                </button>
+              </div>
+              <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
+                <PropertiesPanel 
+                  block={null} 
+                  onChange={() => {}} 
+                  project={project}
+                  updateProject={updateProject}
+                  activePageId={''}
+                  isExpanded={true}
+                  onToggleExpand={() => {}}
+                  hideSettings={true}
+                />
+              </div>
+            </section>
+          )}
+
+        </div>
 
         {/* Right Sidebar */}
         {!isFocusMode && (
@@ -1009,6 +1195,22 @@ export default function StoryEditor() {
         onSave={() => showToast('تم حفظ إعدادات AI بنجاح ✅')}
       />
 
+      {/* Modals */}
+      <TimelineModal isOpen={showTimelineModal} onClose={() => setShowTimelineModal(false)} project={project} updateProject={updateProject} />
+      <RelationshipModal isOpen={showRelationshipModal} onClose={() => setShowRelationshipModal(false)} project={project} />
+
+      {/* Accessibility Modal */}
+      <AccessibilityModal
+        isOpen={showA11yModal}
+        onClose={() => setShowA11yModal(false)}
+        uiScale={uiScale}
+        setUiScale={setUiScale}
+        a11yMode={a11yMode}
+        setA11yMode={setA11yMode}
+        editorZoom={editorZoom}
+        setEditorZoom={setEditorZoom}
+      />
+
       {/* Confirm Dialog Modal */}
       {confirmDialog && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[200] flex justify-center items-center no-print">
@@ -1103,6 +1305,27 @@ export default function StoryEditor() {
                  <h2 className="font-bold flex items-center gap-2"><Sparkles className="text-blue-500" size={20} /> مساعد الكاتب الذكي</h2>
                  <button onClick={() => setShowChatModal(false)} className="text-[var(--text-dim)] hover:text-white"><X size={20} /></button>
               </div>
+              <div className="bg-amber-500/10 border-b border-amber-500/30 p-2 flex justify-center">
+                 <button 
+                   onClick={async () => {
+                     setChatMessages((prev) => [...prev, { role: 'user', content: 'اكتشف الثغرات المنطقية (Plot Holes) في حبكة قصتي، كن محامي الشيطان وانتقد الأحداث بشدة!' }]);
+                     setIsChatting(true);
+                     try {
+                       const { generateSuggestion } = await import('../lib/aiService');
+                       const prompt = 'اكتشف الثغرات المنطقية (Plot Holes) في حبكة القصة المكتوبة حتى الآن، بناء الشخصيات، وتناسق العالم. كن مثل "محامي الشيطان"، وانتقد الأحداث بشدة، واطرح أسئلة صعبة تكشف عيوب أو تناقضات القصة.';
+                       const response = await generateSuggestion(prompt, 'chat', project);
+                       if (response) {
+                         setChatMessages(prev => [...prev, { role: 'ai', content: response }]);
+                       }
+                     } finally {
+                       setIsChatting(false);
+                     }
+                   }}
+                   className="flex items-center gap-2 text-amber-500 bg-amber-500/10 hover:bg-amber-500/20 px-4 py-2 rounded-full text-xs font-bold transition-colors border border-amber-500/30"
+                 >
+                   <Search size={14} /> مُحامي الشيطان: صائد الثغرات
+                 </button>
+              </div>
               <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-4">
                  {chatMessages.length === 0 && (
                    <div className="text-center text-[var(--text-dim)] my-auto opacity-60 flex flex-col items-center gap-3">
@@ -1176,6 +1399,21 @@ export default function StoryEditor() {
         isOpen={showMusicPlayer} 
         onClose={() => setShowMusicPlayer(false)} 
       />
+
+      {showExportModal && (
+        <ExportModal 
+          project={project} 
+          onClose={() => setShowExportModal(false)}
+        />
+      )}
+
+      {showFindReplaceModal && (
+        <FindReplaceModal 
+          project={project}
+          updateProject={updateProject}
+          onClose={() => setShowFindReplaceModal(false)}
+        />
+      )}
 
     </>
   );

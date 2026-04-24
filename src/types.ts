@@ -1,8 +1,61 @@
-export type BlockType = 'text' | 'image' | 'dialogue' | 'table' | 'divider' | 'callout';
+export type BlockType = 'text' | 'image' | 'dialogue' | 'table' | 'divider' | 'callout' | 'chat' | 'quest' | 'document' | 'graphic';
 
 export interface BaseBlock {
   id: string;
   type: BlockType;
+}
+
+export interface ChatMessage {
+  id: string;
+  sender: string;
+  content: string;
+  isSelf: boolean;
+  time?: string;
+}
+
+export interface ChatBlock extends BaseBlock {
+  type: 'chat';
+  messages: ChatMessage[];
+  title?: string; // e.g., Group Chat Name or Contact Name
+}
+
+export interface InventoryItem {
+  id: string;
+  name: string;
+  quantity: string;
+  desc: string;
+}
+
+export interface RpgStat {
+  id: string;
+  name: string;
+  value: string;
+  maxValue?: string;
+  color?: string;
+}
+
+export interface QuestBlock extends BaseBlock {
+  type: 'quest';
+  mode?: 'quest' | 'inventory' | 'choice' | 'spell';
+  title: string;
+  description: string;
+  objective: string;
+  reward: string;
+  status: 'new' | 'in_progress' | 'completed' | 'failed';
+  inventoryItems?: InventoryItem[];
+  stats?: RpgStat[];
+  choices?: { id: string; text: string; votes?: number }[];
+}
+
+export interface DocumentBlock extends BaseBlock {
+  type: 'document';
+  docType: 'journal' | 'newspaper' | 'dossier' | 'epigraph' | 'vision' | 'timer' | 'chat' | 'subtext' | 'terminal' | 'rumor';
+  docStyle?: string;
+  title?: string;
+  content: string;
+  metadata?: string;
+  messages?: ChatMessage[];
+  items?: any[];
 }
 
 export interface TextBlock extends BaseBlock {
@@ -66,7 +119,18 @@ export interface CalloutBlock extends BaseBlock {
   textColor?: string;
 }
 
-export type StoryBlock = TextBlock | ImageBlock | DialogueBlock | TableBlock | DividerBlock | CalloutBlock;
+export type GraphicType = 'evidence' | 'lineage' | 'scroll' | 'minimap' | 'journey' | 'atmosphere' | 'wanted';
+
+export interface GraphicBlock extends BaseBlock {
+  type: 'graphic';
+  graphicType: GraphicType;
+  title?: string;
+  content?: string;
+  imageUrl?: string;
+  items?: any[];
+}
+
+export type StoryBlock = TextBlock | ImageBlock | DialogueBlock | TableBlock | DividerBlock | CalloutBlock | ChatBlock | QuestBlock | DocumentBlock | GraphicBlock;
 
 export interface Chapter {
   id: string;
@@ -87,7 +151,8 @@ export interface ProjectPage {
 export interface Character {
   id: string;
   name: string;
-  avatarUrl: string;
+  avatarUrl: string; // The primary avatar URL
+  images?: { id: string, url: string, name?: string }[]; // The folder of character images
   details: string;
   backstory?: string;
   inventory?: string[];
@@ -229,6 +294,17 @@ export interface FutureQuote {
   link?: string;
 }
 
+export interface StoryEvent {
+  id: string;
+  title: string;
+  description: string;
+  timestamp: string; // e.g. "Year 125, Day 3" or simple date
+  order: number;
+  relatedCharacterIds?: string[];
+  relatedLocationId?: string;
+  isFlashback?: boolean;
+}
+
 export interface ProjectData {
   id: string;
   name: string;
@@ -245,6 +321,7 @@ export interface ProjectData {
   // New Arrays for Worldbuilding & Organization
   chapters?: Chapter[];
   lore?: Lore[];
+  events?: StoryEvent[];
   worldMap?: WorldMapNode[];
   factions?: Faction[];
   relations?: Relation[];
@@ -262,4 +339,8 @@ export interface ProjectData {
   
   // Custom groupings
   otherGroups?: OtherGroup[];
+
+  // Goals & Tracking
+  dailyGoal?: number;
+  wordCountHistory?: Record<string, number>;
 }

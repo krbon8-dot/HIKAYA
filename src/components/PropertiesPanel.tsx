@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { StoryBlock, TextBlock, ImageBlock, DialogueBlock, ProjectData, Character, Lore, Relation, KanbanCard, Chapter, Faction, PlanningItem, WorldMapNode } from '../types';
-import { Sparkles, ImagePlus, UserCircle2, Loader2, Palette, Users, FileText, Settings, Plus, Minus, ZoomIn, ZoomOut, Trash2, BookOpen, Link, KanbanSquare, HeartPulse, X, Globe, Shield, Target, Briefcase, Zap, BookA, AlertTriangle } from 'lucide-react';
+import { Sparkles, ImagePlus, UserCircle2, Loader2, Palette, Users, FileText, Settings, Plus, Minus, ZoomIn, ZoomOut, Trash2, BookOpen, Link, KanbanSquare, HeartPulse, X, Globe, Shield, Target, Briefcase, Zap, BookA, AlertTriangle, MessageSquare } from 'lucide-react';
 import { fileToDataUrl, generateId, cn } from '../lib/utils';
 import { generateSuggestion } from '../lib/aiService';
 
@@ -12,6 +12,7 @@ interface Props {
   activePageId: string;
   isExpanded?: boolean;
   onToggleExpand?: () => void;
+  hideSettings?: boolean;
 }
 
 const FONTS = [
@@ -20,9 +21,9 @@ const FONTS = [
   { id: 'display', name: 'عريض (Display)' }
 ];
 
-export default function PropertiesPanel({ block, onChange, project, updateProject, activePageId, isExpanded, onToggleExpand }: Props) {
+export default function PropertiesPanel({ block, onChange, project, updateProject, activePageId, isExpanded, onToggleExpand, hideSettings }: Props) {
   const [isGenerating, setIsGenerating] = useState(false);
-  const [activeTab, setActiveTab] = useState<'props' | 'chars' | 'scenario' | 'world' | 'kanban' | 'factions'>('props');
+  const [activeTab, setActiveTab] = useState<'props' | 'chars' | 'scenario' | 'world' | 'kanban' | 'factions' | 'dict'>(hideSettings ? 'chars' : 'props');
   const [selectedCharId, setSelectedCharId] = useState<string | null>(null);
   const [selectedLoreId, setSelectedLoreId] = useState<string | null>(null);
   const [selectedFactionId, setSelectedFactionId] = useState<string | null>(null);
@@ -30,6 +31,41 @@ export default function PropertiesPanel({ block, onChange, project, updateProjec
   const [optionsModal, setOptionsModal] = useState<{ isOpen: boolean, options: string[], onSelect: (index: number) => void } | null>(null);
 
   const activePage = project.pages.find(p => p.id === activePageId);
+
+  React.useEffect(() => {
+    const handleOpenEntity = (e: any) => {
+      const name = e.detail?.name;
+      if (!name) return;
+      if (onToggleExpand && !isExpanded) onToggleExpand();
+
+      const char = project.characters?.find(c => c.name === name);
+      if (char) {
+        setActiveTab('chars');
+        setSelectedCharId(char.id);
+        return;
+      }
+      const lore = project.lore?.find(l => l.title === name);
+      if (lore) {
+        setActiveTab('world');
+        setSelectedLoreId(lore.id);
+        return;
+      }
+      const map = project.worldMap?.find(m => m.name === name);
+      if (map) {
+        setActiveTab('world');
+        setSelectedMapNodeId(map.id);
+        return;
+      }
+      const faction = project.factions?.find(f => f.name === name);
+      if (faction) {
+        setActiveTab('factions');
+        setSelectedFactionId(faction.id);
+        return;
+      }
+    };
+    window.addEventListener('open-entity', handleOpenEntity);
+    return () => window.removeEventListener('open-entity', handleOpenEntity);
+  }, [project, isExpanded, onToggleExpand]);
 
   const update = (updates: any) => block && onChange(block.id, updates);
 
@@ -295,15 +331,39 @@ export default function PropertiesPanel({ block, onChange, project, updateProjec
 
       <div className="flex flex-col gap-2 mt-4">
          <label className="text-[0.8rem] text-[var(--text)] flex items-center gap-1"><UserCircle2 size={14}/> الشخصيات المحفوظة</label>
-         <div className="flex gap-2 w-full overflow-x-auto pb-2 -mx-1 px-1">
+         <div className="flex gap-4 w-full overflow-x-auto pb-4 custom-scrollbar items-start">
             {project.characters && project.characters.length > 0 ? project.characters.map((char) => (
-              <div 
-                key={char.id} 
-                onClick={() => update({ avatarUrl: char.avatarUrl })}
-                className={`w-12 h-12 rounded-lg shadow-sm border cursor-pointer hover:border-[var(--accent)] transition-colors flex-shrink-0 bg-white relative overflow-hidden ${b.avatarUrl === char.avatarUrl ? 'border-[var(--accent)] ring-2 ring-[var(--accent)]' : 'border-[var(--border)]'}`}
-                title={char.name}
-              >
-                {char.avatarUrl ? <img src={char.avatarUrl} className="w-full h-full object-cover" /> : <UserCircle2 className="w-full h-full p-2 text-slate-300" />}
+              <div key={char.id} className="flex flex-col items-center gap-1 flex-shrink-0">
+                <div 
+                  onClick={() => update({ avatarUrl: char.avatarUrl })}
+                  className={`w-12 h-12 rounded-lg shadow-sm border cursor-pointer hover:border-[var(--accent)] transition-colors bg-white relative overflow-hidden ${b.avatarUrl === char.avatarUrl ? 'border-[var(--accent)] ring-2 ring-[var(--accent)]' : 'border-[var(--border)]'}`}
+                  title={char.name}
+                >
+                  {char.avatarUrl ? <img src={char.avatarUrl} className="w-full h-full object-cover" /> : <UserCircle2 className="w-full h-full p-2 text-slate-300" />}
+                </div>
+                
+                {/* Secondary images selection from folder */}
+                {char.images && char.images.length > 0 && typeof b.avatarUrl === 'string' && (b.avatarUrl === char.avatarUrl || char.images.some(img => img.url === b.avatarUrl)) && (
+                  <div className="flex bg-[#1a1a1a] border border-[#333] p-1 rounded-full gap-1 items-center">
+                     <div 
+                       onClick={() => update({ avatarUrl: char.avatarUrl })}
+                       className={cn("w-5 h-5 rounded-full border cursor-pointer overflow-hidden flex-shrink-0", b.avatarUrl === char.avatarUrl ? 'border-[var(--accent)] shadow-[0_0_5px_var(--accent)]' : 'border-transparent')}
+                       title="الأساسية"
+                     >
+                        {char.avatarUrl ? <img src={char.avatarUrl} className="w-full h-full object-cover" /> : <UserCircle2 className="w-full h-full text-slate-400" />}
+                     </div>
+                     {char.images.map(img => (
+                        <div 
+                          key={img.id}
+                          onClick={() => update({ avatarUrl: img.url })}
+                          className={cn("w-5 h-5 rounded-full border cursor-pointer overflow-hidden flex-shrink-0", b.avatarUrl === img.url ? 'border-[var(--accent)] shadow-[0_0_5px_var(--accent)]' : 'border-transparent')}
+                          title={img.name || 'مجلد الصور'}
+                        >
+                           <img src={img.url} className="w-full h-full object-cover" />
+                        </div>
+                     ))}
+                  </div>
+                )}
               </div>
             )) : <span className="text-xs text-[var(--text-dim)]">لا توجد شخصيات. أضفها من قسم الشخصيات.</span>}
          </div>
@@ -582,6 +642,26 @@ export default function PropertiesPanel({ block, onChange, project, updateProjec
               حذف الصورة
             </button>
           )}
+
+          {activePage?.isCover && (
+            <div className="flex flex-col gap-2 mt-4 border border-[var(--border)] p-3 rounded bg-black/20">
+              <label className="text-xs text-[var(--accent)] font-bold">مصمم الأغلفة</label>
+              <p className="text-[10px] text-[var(--text-dim)] mb-2">أضف "مربع نص ضخم" للعنوان و"مربع نص عادي" لاسم المؤلف فوق الغلاف. سيتم دمجهم כغلاف كامل ومستقل عند الطباعة بصيغة PDF.</p>
+              
+              <button 
+                onClick={async () => {
+                   const { generateId } = await import('../lib/utils');
+                   const barcodeBlock = {
+                       id: generateId(), type: 'image' as const, width: 200, height: 100, x: 50, y: 500, align: 'center', url: 'https://barcode.tec-it.com/barcode.ashx?data=978020137962&code=ISBN13&translate-esc=on'
+                   } as any;
+                   updateProject({ pages: project.pages.map(p => p.id === activePageId ? { ...p, blocks: [...p.blocks, barcodeBlock] } : p) });
+                }}
+                className="w-full bg-[var(--bg)] border border-[var(--border)] hover:bg-[#333] py-2 text-xs rounded transition-colors flex items-center justify-center gap-2 font-bold"
+              >
+                توليد باركود ISBN للغلاف
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Subplots Tagging feature */}
@@ -760,16 +840,69 @@ export default function PropertiesPanel({ block, onChange, project, updateProjec
               </div>
 
               <div className="flex flex-col gap-2">
-                <label className="text-[0.8rem] text-[var(--text)]">صورة الشخصية</label>
+                <label className="text-[0.8rem] text-[var(--text)]">مجلد صور الشخصية</label>
                 <div className="flex gap-4 items-center">
-                  <div className="w-16 h-16 rounded bg-slate-200 overflow-hidden flex-shrink-0 border border-[var(--border)]">
+                  <div className="w-16 h-16 rounded bg-slate-200 overflow-hidden flex-shrink-0 border border-[var(--border)] relative cursor-pointer" title="الصورة الرئيسية المختارة حالياً">
                      {selectedChar.avatarUrl ? <img src={selectedChar.avatarUrl} referrerPolicy="no-referrer" className="w-full h-full object-cover"/> : <UserCircle2 className="w-full h-full p-2 text-slate-400" />}
+                     <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
+                        <span className="text-[8px] text-white font-bold text-center px-1">الصورة الرئيسية</span>
+                     </div>
                   </div>
-                  <label className="bg-[var(--bg)] border border-[var(--border)] text-[var(--text)] px-3 py-1.5 rounded text-xs hover:bg-[var(--border)] transition-colors cursor-pointer font-medium">
-                    رفع صورة
-                    <input type="file" accept="image/*" className="hidden" onChange={e => handleFileUpload(e, url => updateCharacter(selectedChar.id, { avatarUrl: url }))} />
+                  <label className="bg-[var(--bg)] border border-[var(--border)] text-[var(--accent)] px-3 py-1.5 rounded text-xs hover:border-[var(--accent)] transition-colors cursor-pointer font-medium flex-1 text-center border-dashed">
+                    + رفع صورة أخرى للمجلد
+                    <input type="file" accept="image/*" multiple className="hidden" onChange={async e => {
+                      if (!e.target.files) return;
+                      const newImages = [...(selectedChar.images || [])];
+                      // Iterate and create ObjectURLs (in a real app, upload to storage)
+                      for(let i = 0; i < e.target.files.length; i++) {
+                          const file = e.target.files[i];
+                          const url = URL.createObjectURL(file);
+                          newImages.push({ id: Math.random().toString(36).substr(2, 9), url, name: file.name });
+                          // Automatically set as main if it's the first image ever
+                          if (!selectedChar.avatarUrl && i === 0) {
+                              updateCharacter(selectedChar.id, { avatarUrl: url });
+                          }
+                      }
+                      updateCharacter(selectedChar.id, { images: newImages });
+                    }} />
                   </label>
                 </div>
+                
+                {/* Images grid for this character */}
+                {(selectedChar.images && selectedChar.images.length > 0) && (
+                  <div className="grid grid-cols-4 gap-2 mt-2 bg-[#151515] p-2 rounded-lg border border-[var(--border)] max-h-[150px] overflow-y-auto custom-scrollbar">
+                    {selectedChar.images.map(img => (
+                      <div key={img.id} className="relative group aspect-square rounded overflow-hidden">
+                        <img src={img.url} className="w-full h-full object-cover" />
+                        <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-1">
+                          <button 
+                            onClick={() => updateCharacter(selectedChar.id, { avatarUrl: img.url })}
+                            className="bg-[var(--accent)] text-white text-[9px] px-2 py-1 rounded hover:bg-purple-600"
+                            title="تعيين كصورة رئيسية للمحادثة والواجهة"
+                          >
+                           رئيسية
+                          </button>
+                          <button 
+                            onClick={() => {
+                               // if deleting the main image, clear the main image too
+                               const willClearMain = selectedChar.avatarUrl === img.url;
+                               updateCharacter(selectedChar.id, { 
+                                 images: selectedChar.images?.filter(i => i.id !== img.id),
+                                 avatarUrl: willClearMain ? '' : selectedChar.avatarUrl 
+                               });
+                            }}
+                            className="bg-red-500 text-white text-[9px] px-2 py-1 rounded hover:bg-red-600"
+                          >
+                           حذف
+                          </button>
+                        </div>
+                        {selectedChar.avatarUrl === img.url && (
+                          <div className="absolute top-1 right-1 w-2 h-2 bg-green-500 rounded-full shadow-[0_0_5px_#22c55e]" title="الصورة الرئيسية"></div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               <div className="flex flex-col gap-2">
@@ -1150,12 +1283,25 @@ export default function PropertiesPanel({ block, onChange, project, updateProjec
                  </div>
               )}
 
-              <button 
-                onClick={() => deleteCharacter(selectedChar.id)}
-                className="mt-4 flex items-center justify-center gap-2 text-red-500 hover:text-red-400 bg-red-500/10 hover:bg-red-500/20 py-2 border border-red-500/30 rounded transition-colors text-sm"
-              >
-                <Trash2 size={16} /> حذف الشخصية
-              </button>
+              <div className="flex gap-2 mt-4">
+                <button 
+                  onClick={() => {
+                    const event = new CustomEvent('start-roleplay', { detail: { characterId: selectedChar.id } });
+                    window.dispatchEvent(event);
+                  }}
+                  className="flex-1 flex items-center justify-center gap-2 text-white bg-blue-600 hover:bg-blue-700 py-2 border border-blue-500 rounded transition-colors text-sm font-bold shadow-lg"
+                >
+                  <MessageSquare size={16} /> محادثة مع {selectedChar.name} (Roleplay)
+                </button>
+
+                <button 
+                  onClick={() => deleteCharacter(selectedChar.id)}
+                  className="flex items-center justify-center gap-2 text-red-500 hover:text-red-400 bg-red-500/10 hover:bg-red-500/20 px-3 border border-red-500/30 rounded transition-colors"
+                  title="حذف الشخصية"
+                >
+                  <Trash2 size={16} />
+                </button>
+              </div>
             </div>
           )
         )}
@@ -1537,7 +1683,7 @@ export default function PropertiesPanel({ block, onChange, project, updateProjec
     const deleteFaction = (id: string) => {
       updateProject({ 
         factions: factions.filter(f => f.id !== id),
-        characters: project.characters.map(c => ({
+        characters: (project.characters || []).map(c => ({
           ...c,
           factionIds: c.factionIds?.filter(fid => fid !== id)
         }))
@@ -2113,8 +2259,8 @@ export default function PropertiesPanel({ block, onChange, project, updateProjec
   return (
     <div className="flex flex-col h-full bg-[var(--panel)]">
       <div className="flex w-full border-b border-[var(--border)] p-1.5 gap-0.5 overflow-x-hidden justify-center items-center shrink-0">
-         <button onClick={() => setActiveTab('props')} title="خصائص" className={`p-1.5 rounded flex items-center justify-center transition-colors ${activeTab==='props' ? 'bg-[var(--accent)] text-white' : 'text-[var(--text-dim)] hover:bg-[var(--bg)]'}`}><Settings size={18}/></button>
-         <button onClick={() => setActiveTab('chars')} title="شخصيات" className={`p-1.5 rounded flex items-center justify-center transition-colors ${activeTab==='chars' ? 'bg-[var(--accent)] text-white' : 'text-[var(--text-dim)] hover:bg-[var(--bg)]'}`}><Users size={18}/></button>
+         {!hideSettings && <button onClick={() => setActiveTab('props')} title="خصائص" className={`p-1.5 rounded flex items-center justify-center transition-colors ${activeTab==='props' ? 'bg-[var(--accent)] text-white' : 'text-[var(--text-dim)] hover:bg-[var(--bg)]'}`}><Settings size={18}/></button>}
+         <button onClick={() => { if(hideSettings && activeTab==='props') setActiveTab('chars'); setActiveTab('chars') }} title="شخصيات" className={`p-1.5 rounded flex items-center justify-center transition-colors ${activeTab==='chars' ? 'bg-[var(--accent)] text-white' : 'text-[var(--text-dim)] hover:bg-[var(--bg)]'}`}><Users size={18}/></button>
          <button onClick={() => setActiveTab('scenario')} title="سيناريو" className={`p-1.5 rounded flex items-center justify-center transition-colors ${activeTab==='scenario' ? 'bg-[var(--accent)] text-white' : 'text-[var(--text-dim)] hover:bg-[var(--bg)]'}`}><FileText size={18}/></button>
          <button onClick={() => setActiveTab('world')} title="العالم" className={`p-1.5 rounded flex items-center justify-center transition-colors ${activeTab==='world' ? 'bg-[var(--accent)] text-white' : 'text-[var(--text-dim)] hover:bg-[var(--bg)]'}`}><BookOpen size={18}/></button>
          <button onClick={() => setActiveTab('kanban')} title="تخطيط" className={`p-1.5 rounded flex items-center justify-center transition-colors ${activeTab==='kanban' ? 'bg-[var(--accent)] text-white' : 'text-[var(--text-dim)] hover:bg-[var(--bg)]'}`}><KanbanSquare size={18}/></button>

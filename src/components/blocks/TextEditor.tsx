@@ -41,6 +41,53 @@ export default function TextEditor({ block, project, onChange, onClick }: Props)
     }
   };
 
+  const handleBlur = () => {
+    if (contentEditableRef.current) {
+      let html = contentEditableRef.current.innerHTML;
+
+      if (project && html) {
+         const entities = [
+           ...(project.characters || []).map(c => ({ name: c.name, type: 'char' })),
+           ...(project.lore || []).map(l => ({ name: l.title, type: 'lore' })),
+           ...(project.factions || []).map(f => ({ name: f.name, type: 'faction' })),
+           ...(project.worldMap || []).map(m => ({ name: m.name, type: 'map' })),
+         ].filter(e => e.name && e.name.trim().length > 2);
+         
+         entities.sort((a,b) => b.name.length - a.name.length);
+
+         // We use a regex that matches the entity name ONLY if it is not inside an HTML tag.
+         // A negative lookahead for `(?![^<]*>)` ensures we are not inside a tag.
+         let modifiedHtml = html;
+         
+         // Remove existing lore-links to replace them freshly if needed (optional, robust parsing is hard)
+         // So instead we just wrap unbound texts.
+         entities.forEach(ent => {
+             const safeName = ent.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+             const regex = new RegExp(`(${safeName})(?![^<]*>)(?!(?:[^<]*<\\/span>))`, 'g');
+             modifiedHtml = modifiedHtml.replace(regex, `<span class="text-blue-500 font-bold hover:underline cursor-help entity-link" data-name="$1" title="انقر لتفاصيل الموسوعة (سيظهر في الجانب)">$1</span>`);
+         });
+
+         if (modifiedHtml !== html) {
+             contentEditableRef.current.innerHTML = modifiedHtml;
+             html = modifiedHtml;
+         }
+      }
+      onChange({ content: html });
+    }
+    setTimeout(() => setAcState(s => ({ ...s, visible: false })), 200);
+  };
+
+  const handleSpanClick = (e: React.MouseEvent) => {
+    const target = e.target as HTMLElement;
+    if (target.classList.contains('entity-link')) {
+      const name = target.getAttribute('data-name');
+      if (name) {
+        window.dispatchEvent(new CustomEvent('open-entity', { detail: { name } }));
+      }
+    }
+    if (onClick) onClick();
+  };
+
   const checkAutocomplete = () => {
     const sel = window.getSelection();
     if (!sel || sel.rangeCount === 0 || !project) {
@@ -223,7 +270,7 @@ export default function TextEditor({ block, project, onChange, onClick }: Props)
       </div>
 
       {/* Editor Area */}
-      <div className="relative w-full">
+      <div className="relative w-full" onClick={handleSpanClick}>
           <div
             ref={contentEditableRef}
             contentEditable
