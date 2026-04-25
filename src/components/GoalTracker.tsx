@@ -34,6 +34,12 @@ const BADGES = [
   { id: '75k', title: 'كاتب مخضرم', desc: '75,000 كلمة', target: 75000, icon: '🌠', color: 'text-teal-400' },
   { id: '85k', title: 'بريق الألماسة', desc: '85,000 كلمة', target: 85000, icon: '💎', color: 'text-blue-200' },
   { id: '100k', title: 'أسطورة أدبية', desc: '100,000 كلمة', target: 100000, icon: '🏆', color: 'text-yellow-500' },
+  { id: '150k', title: 'بحر الإبداع', desc: '150,000 كلمة', target: 150000, icon: '🌟', color: 'text-emerald-400' },
+  { id: '200k', title: 'معماري الوجود', desc: '200,000 كلمة', target: 200000, icon: '🌍', color: 'text-cyan-500' },
+  { id: '300k', title: 'سادن الحكايا', desc: '300,000 كلمة', target: 300000, icon: '📚', color: 'text-amber-600' },
+  { id: '500k', title: 'ربان السرد', desc: '500,000 كلمة', target: 500000, icon: '🎩', color: 'text-purple-500' },
+  { id: '700k', title: 'نسيج الخلود', desc: '700,000 كلمة', target: 700000, icon: '✒️', color: 'text-rose-500' },
+  { id: '1m', title: 'السرمدي', desc: '1,000,000 كلمة', target: 1000000, icon: '♾️', color: 'text-fuchsia-500' },
 ];
 
 export const GoalTracker: React.FC<GoalTrackerProps> = ({ project, updateProject }) => {

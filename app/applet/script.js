@@ -1,0 +1,10 @@
+import fs from 'fs';
+let c = fs.readFileSync('src/components/ExportModal.tsx', 'utf8');
+const original = c;
+c = c.replace(/\\\$\\{/g, '${');
+console.log(original === c ? "No change" : "Changed");
+c = original.replace(/\\\\\$\\{/g, '${');
+console.log(original === c ? "No change 2" : "Changed 2");
+c = original.replace(/\\\$\{/g, '${');
+console.log(original === c ? "No change 3" : "Changed 3");
+fs.writeFileSync('src/components/ExportModal.tsx', c);

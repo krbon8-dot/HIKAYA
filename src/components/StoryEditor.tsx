@@ -19,7 +19,6 @@ import PropertiesPanel from './PropertiesPanel';
 import AISettingsModal from './AISettingsModal';
 import { MusicPlayer } from './MusicPlayer';
 import { GoalTracker } from './GoalTracker';
-import { ExportModal } from './ExportModal';
 import { FindReplaceModal } from './FindReplaceModal';
 import { AccessibilityModal } from './AccessibilityModal';
 import { RelationshipModal } from './RelationshipModal';
@@ -93,7 +92,6 @@ export default function StoryEditor() {
   const [isChatting, setIsChatting] = useState(false);
 
   const [printType, setPrintType] = useState<'none' | 'current' | 'all'>('none');
-  const [showExportModal, setShowExportModal] = useState(false);
   const [showFindReplaceModal, setShowFindReplaceModal] = useState(false);
   const [isSplitScreen, setIsSplitScreen] = useState(false);
   const [toastMsg, setToastMsg] = useState('');
@@ -270,9 +268,6 @@ export default function StoryEditor() {
       setPrintType('none');
     };
     window.addEventListener('afterprint', handleAfterPrint);
-    
-    // Fallback: If afterprint fails to fire after a long time (e.g. mobile browsers), 
-    // we want a manual way out or timeout, but native afterprint is generally best.
     return () => window.removeEventListener('afterprint', handleAfterPrint);
   }, []);
 
@@ -371,42 +366,112 @@ export default function StoryEditor() {
 
   const executePrint = (printAll: boolean) => {
     setShowPrintModal(false);
-    setPrintType(printAll ? 'all' : 'current');
+    const type = printAll ? 'all' : 'current';
+    setPrintType(type);
     
-    // Give React time to render all pages into the DOM print-only container
-    setTimeout(async () => {
-      try {
-        const element = document.querySelector('.print-only-container');
-        if (!element) throw new Error("Print container not found");
-        
-        showToast("جاري تجهيز وإنشاء ملف PDF...");
-        
-        // Dynamically import html2pdf to avoid bloating the main bundle
-        // @ts-ignore
-        const html2pdf = (await import('html2pdf.js')).default || (await import('html2pdf.js'));
-        
-        const pdfFormat = project.pageFormat === 'Custom' || !project.pageFormat ? 'a4' : project.pageFormat.toLowerCase();
-        
-        const opt: any = {
-          margin:       0,
-          filename:     `${project.name || 'Hikaya_Story'}.pdf`,
-          image:        { type: 'jpeg', quality: 0.98 },
-          html2canvas:  { scale: 2, useCORS: true, allowTaint: true, logging: false },
-          jsPDF:        { unit: 'mm', format: pdfFormat, orientation: 'portrait' }
-        };
-        
-        // To support correct page breaks in html2pdf
-        opt.pagebreak = { mode: ['css', 'legacy'] };
+    showToast("جاري إنشاء بوابة الطباعة المعزولة...");
 
-        await (html2pdf as any)().set(opt).from(element).save();
-        showToast("تم تنزيل ملف PDF بنجاح! ✅");
-      } catch (err) {
-        console.error("Print to PDF failed:", err);
-        showToast("عذراً، حدث خطأ أثناء إنشاء PDF.");
-      } finally {
+    // Wait for the PrintDisplayBlocks to be rendered in the hidden container
+    setTimeout(() => {
+      const printElement = document.querySelector('.print-container-root');
+      if (!printElement) {
         setPrintType('none');
+        return;
       }
-    }, 800);
+
+      const content = printElement.innerHTML;
+      
+      // Create hidden iframe
+      const iframe = document.createElement('iframe');
+      iframe.style.position = 'fixed';
+      iframe.style.right = '100%';
+      iframe.style.bottom = '100%';
+      iframe.style.width = '0';
+      iframe.style.height = '0';
+      iframe.style.border = 'none';
+      document.body.appendChild(iframe);
+
+      const doc = iframe.contentWindow?.document;
+      if (!doc) return;
+
+      const styles = `
+        @import url('https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&family=Cairo:wght@400;700&family=Tajawal:wght@400;700&display=swap');
+        
+        * { box-sizing: border-box; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+        
+        html, body { 
+          margin: 0 !important; 
+          padding: 0 !important; 
+          background: white !important;
+          color: black !important;
+          font-family: 'Cairo', sans-serif;
+          direction: rtl;
+          width: 210mm;
+        }
+
+        @page { size: A4; margin: 0; }
+        
+        .print-container-root { width: 210mm; }
+        
+        .break-page { 
+          page-break-after: always !important; 
+          break-after: page !important; 
+          height: 0; 
+          display: block; 
+        }
+
+        .avoid-break { page-break-inside: avoid !important; break-inside: avoid !important; }
+
+        /* Canvas Rendering Strategy: Solid Gradients */
+        .dark-block-print {
+          background-image: linear-gradient(rgb(15, 23, 42), rgb(15, 23, 42)) !important;
+          background-color: rgb(15, 23, 42) !important;
+          color: white !important;
+          border-radius: 40px !important;
+          padding: 60px !important;
+          margin: 30px 0 !important;
+          position: relative;
+          overflow: hidden;
+        }
+
+        .dark-block-print * {
+          color: white !important;
+        }
+
+        .graphic-block-style {
+          -webkit-filter: blur(0) !important;
+          filter: blur(0) !important;
+          transform: translateZ(0) !important;
+        }
+
+        img { max-width: 100%; border-radius: 20px; }
+      `;
+
+      doc.open();
+      doc.write(`
+        <!DOCTYPE html>
+        <html dir="rtl">
+        <head>
+          <title>Hikaya Print Portal</title>
+          <style>${styles}</style>
+        </head>
+        <body>
+          <div class="print-container-root">${content}</div>
+          <script>
+            window.onload = function() {
+              setTimeout(function() {
+                window.print();
+                window.frameElement.parentNode.removeChild(window.frameElement);
+              }, 500);
+            };
+          </script>
+        </body>
+        </html>
+      `);
+      doc.close();
+      
+      setPrintType('none');
+    }, 1000);
   };
 
   const addPage = () => {
@@ -448,6 +513,11 @@ export default function StoryEditor() {
     });
   };
 
+  const handlePrintAction = (type: 'current' | 'all') => {
+    setPrintType(type);
+    showToast("جاري تحضير الملف للطباعة...");
+  };
+
   const renderBlockEditor = (block: StoryBlock) => {
     switch (block.type) {
       case 'text': return <TextEditor block={block as any} project={project} onChange={(u) => updateBlock(block.id, u)} onClick={() => setSelectedBlockId(block.id)} />;
@@ -465,7 +535,7 @@ export default function StoryEditor() {
     }
   };
 
-  const selectedBlock = blocks.find(b => b.id === selectedBlockId) || null;
+  const selectedBlock = project.pages.flatMap(p => p.blocks).find(b => b.id === selectedBlockId) || null;
 
   if (!project || !activePage) return null;
 
@@ -476,16 +546,19 @@ export default function StoryEditor() {
       return (
         <div {...props} style={{
           direction: b.align === 'left' ? 'ltr' : 'rtl',
-          color: b.color || '#000',
+          color: (b.color && b.color !== '#e5e7eb') ? `${b.color} !important` : 'rgb(0, 0, 0) !important',
           fontFamily: b.fontFamily ? `var(--font-${b.fontFamily})` : undefined,
           fontSize: b.fontSize ? `${b.fontSize}px` : undefined,
           lineHeight: b.fontSize ? '1.5' : undefined,
-          textAlign: b.align === 'center' ? 'center' : (b.align === 'left' ? 'left' : 'right')
-        }} className={cn(
-          "w-full min-h-[80px] p-4 break-words relative z-10",
-          b.style === 'h1' && "text-4xl font-bold font-sans",
-          b.style === 'h2' && "text-2xl font-semibold font-sans",
-          b.style === 'quote' && "border-r-4 border-r-purple-500 pr-4 text-slate-700 bg-purple-50",
+          textAlign: b.align === 'center' ? 'center' : (b.align === 'left' ? 'left' : 'right'),
+          marginBottom: '1rem',
+          WebkitPrintColorAdjust: 'exact',
+          printColorAdjust: 'exact'
+        } as any} className={cn(
+          "w-full p-4 break-words relative z-10 avoid-break force-background",
+          b.style === 'h1' && "text-4xl font-bold mb-6",
+          b.style === 'h2' && "text-2xl font-semibold mb-4",
+          b.style === 'quote' && "border-r-4 border-r-purple-500 pr-5 italic",
           b.style === 'normal' && "text-lg leading-relaxed font-medium"
         )} dangerouslySetInnerHTML={{ __html: b.content }} />
       );
@@ -496,7 +569,7 @@ export default function StoryEditor() {
       if (imagesArr.length === 0) return null;
       return (
         <div {...props} className={cn(
-          "py-4 w-full flex flex-wrap gap-4 relative z-10",
+          "py-4 w-full flex flex-wrap gap-4 relative z-10 avoid-break justify-center",
           b.align === 'center' ? 'justify-center' : b.align === 'left' ? 'justify-start' : 'justify-end'
         )}>
           {imagesArr.map((img: any) => (
@@ -510,7 +583,7 @@ export default function StoryEditor() {
                  width: img.width ? `${img.width}px` : 'auto',
                  height: img.height ? `${img.height}px` : 'auto',
                  borderRadius: `${b.borderRadius ?? 8}px`,
-                 objectFit: 'fill'
+                 objectFit: 'cover'
                }}
             />
           ))}
@@ -519,65 +592,72 @@ export default function StoryEditor() {
     }
     if (block.type === 'dialogue') {
       const b = block as any;
-      const isRtl = b.direction === 'rtl';
+      const isRtl = b.direction !== 'ltr';
       return (
-        <div {...props} className="py-4 flex flex-col w-full break-inside-avoid relative z-10">
+        <div {...props} className="py-4 flex flex-col w-full avoid-break relative z-10">
            <div className={cn("flex items-start gap-4", isRtl ? "flex-row" : "flex-row-reverse")}>
-              <div 
-                className="flex-shrink-0"
-                style={{ 
-                  width: b.avatarSize ? `${b.avatarSize}px` : '128px',
-                  height: b.avatarSize ? `${b.avatarSize}px` : '128px'
-                }}
-              >
-                {b.avatarUrl && (
-                  <div className="w-full h-full rounded-md shadow-md border-2 border-black overflow-hidden bg-white">
-                    <img src={b.avatarUrl} referrerPolicy="no-referrer" className="w-full h-full object-cover" style={{ imageRendering: 'high-quality' }} alt="Avatar" />
+              {b.avatarUrl && (
+                <div 
+                  className="flex-shrink-0"
+                  style={{ 
+                    width: b.avatarSize ? `${b.avatarSize}px` : '96px',
+                    height: b.avatarSize ? `${b.avatarSize}px` : '96px'
+                  }}
+                >
+                  <div className="w-full h-full rounded-lg border-2 border-slate-300 overflow-hidden bg-white">
+                    <img src={b.avatarUrl} referrerPolicy="no-referrer" className="w-full h-full object-cover" alt="Avatar" />
                   </div>
-                )}
-              </div>
-              <div className={cn("flex-grow flex flex-col relative", isRtl ? "items-start mt-2" : "items-end mt-2")}>
+                </div>
+              )}
+              <div className={cn("flex-grow flex flex-col", isRtl ? "items-start" : "items-end")}>
                  <div 
                    className={cn(
-                     "relative bg-white p-4 sm:p-6 shadow-sm border-2 border-black min-h-[80px]",
-                     b.bubbleType === 'speech' && "rounded-3xl",
-                     b.bubbleType === 'thought' && "rounded-[2rem] border-dashed border-2",
-                     b.bubbleType === 'shout' && "rounded-none",
-                     b.bubbleType === 'whisper' && "rounded-2xl opacity-75 scale-95 origin-bottom",
-                     b.bubbleType === 'electronic' && "rounded-sm",
-                     b.bubbleType === 'scared' && "rounded-[30%_70%_70%_30%_/_30%_30%_70%_70%]",
-                     b.bubbleType === 'narrator' && "rounded-none border-t-4 border-b-4 border-l-0 border-r-0 !bg-transparent !shadow-none !border-black",
-                     b.bubbleType === 'system' && "rounded-sm border border-slate-500 !bg-slate-900 !text-green-400 font-mono shadow-[inset_0_0_10px_rgba(0,0,0,0.5)]",
-                     b.bubbleType === 'speech' && (isRtl ? "rounded-tr-sm" : "rounded-tl-sm")
+                     "relative p-5 border-2 border-slate-200 min-h-[60px]",
+                     b.bubbleType === 'speech' && "rounded-2xl",
+                     b.bubbleType === 'thought' && "rounded-[2rem] border-dashed",
+                     b.bubbleType === 'shout' && "rounded-md border-black",
+                     b.bubbleType === 'whisper' && "rounded-2xl opacity-80 border-dotted",
+                     b.bubbleType === 'electronic' && "rounded-none border-4 font-mono",
+                     b.bubbleType === 'narrator' && "rounded-none border-x-0 border-y-2",
+                     b.bubbleType === 'system' && "rounded-sm border-slate-700 font-mono"
                    )} 
                    style={{ 
-                     backgroundColor: (b.bubbleType === 'narrator' || b.bubbleType === 'system') ? undefined : (b.bubbleColor || '#ffffff'),
-                     borderWidth: b.bubbleType === 'electronic' ? '4px' : (b.bubbleType === 'narrator' ? undefined : '2px'),
-                     borderStyle: b.bubbleType === 'whisper' ? 'dotted' : b.bubbleType === 'thought' ? 'dashed' : 'solid',
+                     backgroundColor: b.bubbleType === 'system' ? 'rgb(15, 23, 42) !important' : ( (b.bubbleType === 'narrator') ? 'transparent !important' : (b.bubbleColor || 'rgb(255, 255, 255) !important')),
+                     backgroundImage: (b.bubbleType === 'system') ? 'linear-gradient(rgb(15, 23, 42), rgb(15, 23, 42)) !important' : ( (b.bubbleType === 'narrator') ? 'none' : `linear-gradient(${b.bubbleColor || 'rgb(255, 255, 255)'}, ${b.bubbleColor || 'rgb(255, 255, 255)'}) !important`),
+                     color: b.bubbleType === 'system' ? 'rgb(74, 222, 128) !important' : 'rgb(30, 41, 59) !important',
+                     borderColor: (b.bubbleType === 'narrator') ? 'rgb(30, 41, 59) !important' : undefined,
                      width: b.bubbleWidth || 'auto',
                      height: b.bubbleHeight || 'auto',
-                     direction: isRtl ? 'rtl' : 'ltr'
-                   }}
+                     direction: isRtl ? 'rtl' : 'ltr',
+                     WebkitPrintColorAdjust: 'exact',
+                     printColorAdjust: 'exact'
+                   } as any}
                  >
-                    {b.bubbleType === 'speech' && (
-                      <svg 
-                        className={cn("absolute top-6 w-6 h-6 z-10", isRtl ? "-right-[14px] rotate-180" : "-left-[14px]")}
-                        style={{ filter: "drop-shadow(-2px 0px 0px rgba(0,0,0,1))", color: b.bubbleColor || '#ffffff' }}
-                        fill="currentColor" viewBox="0 0 24 24" preserveAspectRatio="none"
-                      >
-                        <path d="M24 4L0 12L24 20V4Z" />
-                      </svg>
-                    )}
+                   {/* SVG Tail for speech bubbles in print */}
+                   {b.bubbleType === 'speech' && (
+                     <svg 
+                       className={cn(
+                         "absolute top-4 w-5 h-5 z-10 pointer-events-none",
+                         isRtl ? "-right-[12px] rotate-180" : "-left-[12px]"
+                       )}
+                       style={{ filter: "drop-shadow(-1px 0px 0px rgba(0,0,0,0.5))", color: b.bubbleColor || '#ffffff' }}
+                       fill="currentColor" 
+                       viewBox="0 0 24 24"
+                       preserveAspectRatio="none"
+                     >
+                       <path d="M24 4L0 12L24 20V4Z" />
+                     </svg>
+                   )}
                     <div
                       className={cn(
-                        "w-full h-full font-medium text-lg leading-relaxed text-slate-800 whitespace-pre-wrap",
-                        b.bubbleType === 'shout' && "font-bold text-xl",
-                        b.bubbleType === 'thought' && "italic text-slate-600",
-                        b.bubbleType === 'whisper' && "text-sm text-slate-500",
-                        b.bubbleType === 'electronic' && "font-mono font-bold tracking-tighter",
-                        b.bubbleType === 'system' && "text-green-400 font-mono"
+                        "w-full h-full font-medium text-lg leading-relaxed",
+                        b.bubbleType === 'shout' && "font-bold text-xl uppercase",
+                        b.bubbleType === 'thought' && "italic",
+                        b.bubbleType === 'whisper' && "text-sm"
                       )}
-                      style={{ fontFamily: b.fontFamily ? `var(--font-${b.fontFamily})` : undefined }}
+                      style={{ 
+                        color: b.bubbleType === 'system' ? 'rgb(74, 222, 128) !important' : 'rgb(30, 41, 59) !important'
+                      } as any}
                     >
                       {b.text}
                     </div>
@@ -590,13 +670,13 @@ export default function StoryEditor() {
     if (block.type === 'table') {
       const b = block as any;
       return (
-        <div {...props} className={cn("py-4 pb-0 w-full flex relative z-10", b.align === 'center' ? 'justify-center' : b.align === 'left' ? 'justify-start' : 'justify-end')}>
-           <table className="border-collapse border border-gray-400 max-w-full" style={{ tableLayout: 'fixed' }}>
+        <div {...props} className={cn("py-4 w-full flex relative z-10 avoid-break", b.align === 'center' ? 'justify-center' : b.align === 'left' ? 'justify-start' : 'justify-end')}>
+           <table className="border-collapse border border-slate-300 w-full force-background">
               <tbody>
                 {(b.rows || []).map((row: string[], rIdx: number) => (
-                  <tr key={rIdx} className={rIdx === 0 ? "bg-gray-100 font-bold" : "border-t border-gray-300"}>
+                  <tr key={rIdx} className={rIdx === 0 ? "bg-slate-100 font-bold" : ""} style={rIdx === 0 ? { backgroundColor: '#f1f5f9 !important' } : {}}>
                     {row.map((cell: string, cIdx: number) => (
-                      <td key={cIdx} className="border border-gray-400 p-3 whitespace-pre-wrap break-words" dir="rtl">
+                      <td key={cIdx} className="border border-slate-300 p-3 text-sm text-slate-800" dir="rtl" style={{ color: '#1e293b !important' }}>
                         {cell}
                       </td>
                     ))}
@@ -609,37 +689,336 @@ export default function StoryEditor() {
     }
     if (block.type === 'divider') {
       const b = block as any;
-      const getStyleParams = () => {
-        if (b.style === 'wavy') return { borderTop: `${b.thickness || 2}px solid ${b.color || '#d1d5db'}` };
-        return { borderTop: `${b.thickness || 2}px ${b.style || 'solid'} ${b.color || '#d1d5db'}` };
-      };
       return (
-        <div {...props} className="py-6 w-full flex items-center justify-center relative z-10">
-          <hr style={b.style !== 'wavy' ? getStyleParams() : { borderTop: `${b.thickness||2}px dashed ${b.color||'#ccc'}`}} className="w-4/5 mx-auto" />
+        <div {...props} className="py-8 w-full flex items-center justify-center relative z-10 avoid-break">
+          <div 
+            style={{ 
+              borderTop: `${b.thickness || 2}px ${b.style === 'wavy' ? 'dashed' : (b.style || 'solid')} ${b.color || '#cbd5e1'} !important`,
+              width: '80%',
+              WebkitPrintColorAdjust: 'exact'
+            } as any} 
+          />
         </div>
       );
     }
     if (block.type === 'callout') {
       const b = block as any;
-      const getClasses = () => {
-        switch (b.calloutType) {
-          case 'flashback': return "bg-gray-100 border-gray-400 text-gray-800 italic";
-          case 'warning': return "bg-red-50 border-red-300 text-red-900";
-          case 'info': return "bg-blue-50 border-blue-300 text-blue-900";
-          case 'quote': return "bg-amber-50 border-amber-300 text-amber-900 font-serif";
-          case 'note':
-          default: return "bg-yellow-50 border-yellow-300 text-yellow-900";
-        }
-      };
       return (
-        <div {...props} className="py-4 w-full relative z-10">
+        <div {...props} className="py-4 w-full relative z-10 avoid-break">
            <div 
-             className={cn("w-full rounded-xl border p-5 font-sans text-lg leading-relaxed shadow-sm block break-inside-avoid px-8", getClasses())}
-             style={b.backgroundColor ? { backgroundColor: b.backgroundColor, color: b.textColor } : {}}
+             className="w-full rounded-2xl border p-6 font-sans text-lg leading-relaxed shadow-sm force-background"
+             style={{
+               backgroundColor: (b.backgroundColor || '#f8fafc') + ' !important',
+               color: (b.textColor || '#1e293b') + ' !important',
+               borderColor: '#e2e8f0 !important',
+               WebkitPrintColorAdjust: 'exact',
+               printColorAdjust: 'exact'
+             } as any}
              dir="rtl"
            >
+             {b.title && <div className="font-bold mb-2 text-sm uppercase opacity-70 tracking-wider">[{b.calloutType}]</div>}
              <div className="whitespace-pre-wrap">{b.content}</div>
            </div>
+        </div>
+      );
+    }
+    if (block.type === 'document') {
+      const b = block as any;
+      const getDocStyles = () => {
+        if (b.docType === 'journal') return { backgroundImage: 'linear-gradient(rgb(253, 246, 227), rgb(253, 246, 227)) !important', color: 'rgb(92, 74, 61) !important', borderColor: 'rgb(234, 221, 197) !important' };
+        if (b.docType === 'newspaper') return { backgroundImage: 'linear-gradient(rgb(248, 249, 250), rgb(248, 249, 250)) !important', color: 'rgb(26, 26, 26) !important', borderColor: 'rgb(26, 26, 26) !important', borderWidth: '4px', borderStyle: 'double' };
+        if (b.docType === 'dossier') return { backgroundImage: 'linear-gradient(rgb(255, 255, 255), rgb(255, 255, 255)) !important', borderColor: 'rgb(226, 232, 240) !important', borderTopWidth: '30px', borderTopColor: 'rgb(153, 27, 27) !important' };
+        return { backgroundImage: 'linear-gradient(rgb(255, 255, 255), rgb(255, 255, 255)) !important', borderColor: 'rgb(226, 232, 240) !important' };
+      };
+      return (
+        <div {...props} className="py-6 w-full relative z-10 avoid-break">
+           <div 
+             className="p-8 rounded-sm border shadow-sm force-background" 
+             dir="rtl"
+             style={{ 
+               ...getDocStyles(),
+               WebkitPrintColorAdjust: 'exact', 
+               printColorAdjust: 'exact' 
+             } as any}
+           >
+             {b.metadata && <div className="font-mono text-xs opacity-60 mb-4 border-b pb-2" style={{ borderBottomColor: 'rgba(0,0,0,0.1) !important' }}>{b.metadata}</div>}
+             {b.title && <div className="text-xl font-bold mb-4 text-center border-b-2 pb-2" style={{ borderBottomColor: 'currentColor !important' }}>{b.title}</div>}
+             <div className="text-lg leading-relaxed whitespace-pre-wrap font-serif italic">{b.content}</div>
+           </div>
+        </div>
+      );
+    }
+    if (block.type === 'chat') {
+      const b = block as any;
+      return (
+        <div {...props} className="py-6 w-full relative z-10 flex justify-center avoid-break">
+           <div 
+             className="w-[300px] rounded-[2.5rem] border-[8px] border-slate-800 overflow-hidden p-4 flex flex-col gap-2"
+             style={{ 
+               backgroundImage: 'linear-gradient(rgb(241, 245, 249), rgb(241, 245, 249)) !important',
+               borderColor: 'rgb(30, 41, 59) !important' 
+             } as any}
+           >
+              <div className="text-center font-bold text-xs mb-2 text-slate-500 pb-2 border-b border-slate-200" style={{ borderBottomColor: 'rgba(0,0,0,0.1) !important' }}>{b.title || 'رسائل'}</div>
+              {(b.messages || []).map((m: any) => (
+                <div 
+                  key={m.id} 
+                  className={cn("max-w-[80%] p-3 rounded-xl text-xs", m.isSelf ? "self-end" : "self-start")}
+                  style={{ 
+                    WebkitPrintColorAdjust: 'exact', 
+                    printColorAdjust: 'exact',
+                    backgroundImage: m.isSelf ? 'linear-gradient(rgb(59, 130, 246), rgb(59, 130, 246)) !important' : 'linear-gradient(rgb(255, 255, 255), rgb(255, 255, 255)) !important',
+                    color: m.isSelf ? 'rgb(255, 255, 255) !important' : 'rgb(30, 41, 59) !important',
+                    borderRadius: m.isSelf ? '12px 12px 0 12px' : '12px 12px 12px 0',
+                    border: m.isSelf ? 'none' : '1px solid rgb(226, 232, 240) !important'
+                  } as any}
+                >
+                   {!m.isSelf && <div className="font-bold opacity-70 mb-1 text-[10px]">{m.sender}</div>}
+                   <div>{m.content}</div>
+                   <div className="text-[8px] opacity-60 mt-1 text-left">{m.time}</div>
+                </div>
+              ))}
+           </div>
+        </div>
+      );
+    }
+    if (block.type === 'quest') {
+      const b = block as any;
+      return (
+        <div {...props} className="py-6 w-full relative z-10 flex justify-center avoid-break">
+           <div 
+             className="w-full max-w-md border-4 border-double rounded-xl p-6" 
+             dir="rtl"
+             style={{ 
+               backgroundImage: 'linear-gradient(rgb(255, 251, 235), rgb(255, 251, 235)) !important',
+               borderColor: 'rgb(217, 119, 6) !important',
+               WebkitPrintColorAdjust: 'exact'
+             } as any}
+           >
+              <div className="text-center font-bold text-xl mb-4 border-b pb-2" style={{ color: 'rgb(217, 119, 6) !important', borderBottomColor: 'rgb(254, 243, 199) !important' }}>📜 {b.title || 'مهمة جديدة'}</div>
+              <div className="space-y-4">
+                 <div><span className="font-bold" style={{ color: 'rgb(180, 83, 9) !important' }}>الوصف:</span> <p className="text-sm italic text-slate-800">{b.description}</p></div>
+                 <div><span className="font-bold" style={{ color: 'rgb(180, 83, 9) !important' }}>الهدف:</span> <p className="text-sm font-bold text-slate-900">{b.objective}</p></div>
+                 <div className="flex justify-between items-center p-3 rounded-lg" style={{ backgroundImage: 'linear-gradient(rgba(253, 230, 138, 0.5), rgba(253, 230, 138, 0.5)) !important' }}>
+                    <div><span className="font-bold" style={{ color: 'rgb(180, 83, 9) !important' }}>المكافأة:</span> <span className="text-sm text-slate-800">{b.reward}</span></div>
+                    <div className="px-3 py-1 text-white rounded-md text-[10px] font-bold uppercase" style={{ backgroundImage: 'linear-gradient(rgb(217, 119, 6), rgb(217, 119, 6)) !important', color: 'rgb(255, 255, 255) !important' }}>{b.status}</div>
+                 </div>
+              </div>
+           </div>
+        </div>
+      );
+    }
+    if (block.type === 'graphic') {
+      const b = block as any;
+      const GraphicDisplay = () => {
+        if (b.graphicType === 'evidence') {
+          return (
+            <div 
+              className="p-10 rounded-lg border-[10px] border-slate-900 shadow-2xl relative min-h-[400px] flex flex-col items-center dark-block-print"
+              style={{
+                backgroundImage: 'linear-gradient(rgb(17, 17, 17), rgb(17, 17, 17)) !important',
+                backgroundColor: 'rgb(17, 17, 17) !important',
+                borderColor: 'rgb(15, 23, 42) !important'
+              } as any}
+            >
+               <div className="flex justify-between items-center w-full mb-10 border-b border-white/10 pb-6" style={{ borderBottomColor: 'rgba(255,255,255,0.1) !important' }}>
+                  <h3 className="text-white text-3xl font-black uppercase tracking-[0.3em] font-mono" style={{ color: 'white !important' }}>{b.title || 'CRIME BOARD'}</h3>
+                  <div className="text-red-600 font-bold text-sm tracking-widest uppercase" style={{ color: 'rgb(220, 38, 38) !important' }}>Classified Evidence</div>
+               </div>
+               <div className="flex flex-wrap gap-10 justify-center w-full">
+                  {(b.items || []).map((item: any) => (
+                    <div 
+                      key={item.id} 
+                      className="p-5 shadow-[0_5px_15px_rgba(0,0,0,0.5)] border border-[#ccc] rotate-[-3deg] w-48 relative graphic-block-style"
+                      style={{ 
+                        backgroundImage: 'linear-gradient(rgb(245, 245, 245), rgb(245, 245, 245)) !important',
+                        backgroundColor: 'rgb(245, 245, 245) !important',
+                        borderColor: 'rgb(204, 204, 204) !important'
+                      } as any}
+                    >
+                       <div className="w-4 h-4 rounded-full bg-red-600 absolute -top-2 left-1/2 -translate-x-1/2 shadow-lg" style={{ backgroundColor: 'rgb(220, 38, 38) !important' }} />
+                       <div className="font-bold text-black text-center mb-3 text-lg border-b border-black/10 pb-1" style={{ color: 'black !important', borderBottomColor: 'rgba(0,0,0,0.1) !important' }}>{item.name}</div>
+                       <div className="text-blue-900 text-sm whitespace-pre-wrap leading-relaxed" style={{ color: 'rgb(30, 58, 138) !important' }}>{item.desc}</div>
+                    </div>
+                  ))}
+               </div>
+            </div>
+          );
+        }
+        if (b.graphicType === 'lineage') {
+          return (
+            <div 
+              className="p-12 rounded-3xl border-4 border-slate-200 flex flex-col items-center w-full shadow-inner"
+              style={{
+                backgroundImage: 'linear-gradient(rgb(248, 250, 252), rgb(248, 250, 252)) !important',
+                backgroundColor: 'rgb(248, 250, 252) !important',
+                borderColor: 'rgb(226, 232, 240) !important'
+              } as any}
+            >
+               <h3 className="text-slate-800 text-4xl font-serif font-bold mb-12 border-b-2 border-slate-300 pb-4 w-full text-center" style={{ color: 'rgb(30, 41, 59) !important', borderBottomColor: 'rgb(203, 213, 225) !important' }}>{b.title || 'Royal Lineage'}</h3>
+               <div className="w-full flex flex-col gap-6 max-w-2xl">
+                  {(b.items || []).map((item: any) => (
+                    <div 
+                      key={item.id} 
+                      className="flex items-center gap-6 border-2 border-slate-200 p-5 rounded-2xl shadow-sm graphic-block-style"
+                      style={{
+                        backgroundImage: 'linear-gradient(white, white) !important',
+                        backgroundColor: 'white !important',
+                        borderColor: 'rgb(226, 232, 240) !important'
+                      } as any}
+                    >
+                       <div 
+                        className="w-16 h-16 rounded-full border-4 border-amber-500/50 flex items-center justify-center text-amber-700 text-2xl font-black"
+                        style={{
+                          backgroundImage: 'linear-gradient(rgb(255, 251, 235), rgb(255, 251, 235)) !important',
+                          backgroundColor: 'rgb(255, 251, 235) !important',
+                          borderColor: 'rgba(245, 158, 11, 0.5) !important',
+                          color: 'rgb(180, 83, 9) !important'
+                        } as any}
+                       >
+                          {item.name ? item.name.charAt(0) : '?'}
+                       </div>
+                       <div className="flex-1">
+                          <div className="text-2xl font-bold text-slate-900 mb-1" style={{ color: 'rgb(15, 23, 42) !important' }}>{item.name}</div>
+                          <div className="text-slate-500 font-medium italic" style={{ color: 'rgb(100, 116, 139) !important' }}>{item.role}</div>
+                       </div>
+                    </div>
+                  ))}
+               </div>
+            </div>
+          );
+        }
+        if (b.graphicType === 'scroll') {
+          return (
+            <div 
+              className="p-20 border-x-[20px] shadow-2xl relative overflow-hidden graphic-block-style" 
+              style={{ 
+                backgroundImage: 'linear-gradient(rgb(244, 235, 208), rgb(244, 235, 208)) !important',
+                backgroundColor: 'rgb(244, 235, 208) !important',
+                borderColor: 'rgba(139, 115, 85, 0.4) !important'
+              } as any}
+            >
+               <div className="absolute top-0 left-0 w-full h-10 bg-gradient-to-b from-[#bda67a]/50 to-transparent" />
+               <div className="absolute bottom-0 left-0 w-full h-10 bg-gradient-to-t from-[#bda67a]/50 to-transparent" />
+               <h3 className="text-5xl font-black text-[#3a2818] text-center mb-12 uppercase tracking-widest" style={{ color: 'rgb(58, 40, 24) !important' }}>{b.title}</h3>
+               <div className="text-2xl leading-[2.5] text-[#5c4a3d] whitespace-pre-wrap font-serif italic text-justify px-10 border-b border-[#8b7355]/20 pb-12 mb-12" style={{ color: 'rgb(92, 74, 61) !important', borderBottomColor: 'rgba(139, 115, 85, 0.2) !important' }}>
+                 {b.content}
+               </div>
+               <div className="flex justify-between px-10">
+                  <div className="text-center italic text-[#8b7355] border-t border-[#8b7355]/50 pt-3 w-48" style={{ color: 'rgb(139, 115, 85) !important' }}>Seal of the Origin</div>
+                  <div 
+                    className="w-20 h-20 rounded-full flex items-center justify-center text-red-200 text-4xl shadow-xl border-4 border-red-950 border-double rotate-12"
+                    style={{
+                      backgroundImage: 'linear-gradient(rgb(127, 29, 29), rgb(127, 29, 29)) !important',
+                      backgroundColor: 'rgb(127, 29, 29) !important',
+                      borderColor: 'rgb(69, 10, 10) !important'
+                    } as any}
+                  >📜</div>
+                  <div className="text-center italic text-[#8b7355] border-t border-[#8b7355]/50 pt-3 w-48" style={{ color: 'rgb(139, 115, 85) !important' }}>Mark of the End</div>
+               </div>
+            </div>
+          );
+        }
+        if (b.graphicType === 'wanted') {
+          return (
+            <div 
+              className="p-12 border-8 border-double shadow-2xl flex flex-col items-center graphic-block-style" 
+              style={{ 
+                backgroundImage: 'linear-gradient(rgb(232, 220, 184), rgb(232, 220, 184)) !important',
+                backgroundColor: 'rgb(232, 220, 184) !important',
+                borderColor: 'rgb(139, 115, 85) !important'
+              } as any}
+            >
+               <h4 className="text-7xl font-black text-[#2a1f16] tracking-[0.3em] mb-4 uppercase" style={{ color: 'rgb(42, 31, 22) !important' }}>WANTED</h4>
+               <div 
+                className="text-2xl font-bold px-10 py-2 mb-10 tracking-widest"
+                style={{
+                  backgroundImage: 'linear-gradient(rgb(42, 31, 22), rgb(42, 31, 22)) !important',
+                  backgroundColor: 'rgb(42, 31, 22) !important',
+                  color: 'rgb(232, 220, 184) !important'
+                } as any}
+               >DEAD OR ALIVE</div>
+               <div 
+                className="w-full aspect-square border-8 overflow-hidden flex items-center justify-center relative"
+                style={{
+                  backgroundImage: 'linear-gradient(rgb(194, 178, 143), rgb(194, 178, 143)) !important',
+                  backgroundColor: 'rgb(194, 178, 143) !important',
+                  borderColor: 'rgb(58, 40, 24) !important'
+                } as any}
+               >
+                  {b.imageUrl ? (
+                    <img src={b.imageUrl} className="w-full h-full object-cover mix-blend-multiply opacity-80 sepia grayscale-[0.5]" referrerPolicy="no-referrer" />
+                  ) : (
+                    <div className="text-8xl opacity-20">💀</div>
+                  )}
+               </div>
+               <div className="text-5xl font-black text-[#2a1f16] mb-6 underline decoration-4 underline-offset-8" style={{ color: 'rgb(42, 31, 22) !important' }}>{b.title}</div>
+               <div className="text-2xl text-[#3a2818] font-bold text-center mb-10 px-6 italic" style={{ color: 'rgb(58, 40, 24) !important' }}>{b.content}</div>
+               <div className="w-full border-t-2 border-b-2 border-[#8b7355]/50 py-6 text-center" style={{ borderTopColor: 'rgba(139, 115, 85, 0.5) !important', borderBottomColor: 'rgba(139, 115, 85, 0.5) !important' }}>
+                  <div className="text-sm font-bold text-[#5c4a3d] uppercase tracking-widest mb-2" style={{ color: 'rgb(92, 74, 61) !important' }}>Reward for Capture</div>
+                  <div className="text-6xl font-black text-red-800 tracking-tighter" style={{ color: 'rgb(153, 27, 27) !important' }}>{(b.items && b.items[0]?.name) || '$10,000'}</div>
+               </div>
+            </div>
+          );
+        }
+        // Default / Generic Graphic
+        return (
+          <div 
+            className="w-full max-w-2xl p-16 relative overflow-hidden dark-block-print" 
+            dir="rtl"
+            style={{
+              backgroundImage: 'linear-gradient(rgb(15, 23, 42), rgb(15, 23, 42)) !important',
+              backgroundColor: 'rgb(15, 23, 42) !important',
+              borderRadius: '40px !important'
+            } as any}
+          >
+             {b.title && <div className="text-center font-bold text-4xl mb-12 tracking-[0.5em] uppercase text-purple-400" style={{ color: 'rgb(192, 132, 252) !important' }}>{b.title}</div>}
+             <div className="text-center text-3xl leading-relaxed mb-16 font-medium px-8 text-slate-100" style={{ color: 'rgb(241, 245, 249) !important' }}>{b.content}</div>
+             {b.items && b.items.length > 0 && (
+               <div className="mb-14 flex flex-wrap gap-5 justify-center">
+                 {b.items.map((it: any, i: number) => (
+                   <div 
+                    key={i} 
+                    className="px-10 py-4 text-lg border rounded-full text-slate-100"
+                    style={{ 
+                      backgroundImage: 'linear-gradient(rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.1)) !important',
+                      backgroundColor: 'rgba(255, 255, 255, 0.1) !important',
+                      borderColor: 'rgba(255, 255, 255, 0.2) !important',
+                      color: 'rgb(241, 245, 249) !important'
+                    } as any}
+                   >
+                     {it.name || it.label}
+                   </div>
+                 ))}
+               </div>
+             )}
+          </div>
+        );
+      };
+
+      return (
+        <div {...props} className="py-12 w-full relative z-10 flex justify-center avoid-break">
+           {GraphicDisplay()}
+        </div>
+      );
+    }
+    if (block.type === 'sfx') {
+      const b = block as any;
+      return (
+        <div {...props} className={cn(
+          "py-12 w-full relative z-10 flex avoid-break",
+          b.align === 'center' ? 'justify-center' : b.align === 'left' ? 'justify-start' : 'justify-end'
+        )}>
+          <div className="text-7xl font-black italic tracking-tighter uppercase p-8 rounded-3xl graphic-block-style" 
+            style={{ 
+              transform: 'rotate(-5deg)',
+              color: '#a855f7 !important',
+              backgroundImage: 'linear-gradient(rgba(168, 85, 247, 0.1), rgba(168, 85, 247, 0.1)) !important',
+              WebkitPrintColorAdjust: 'exact',
+              printColorAdjust: 'exact'
+            } as any}>
+            {b.text}
+          </div>
         </div>
       );
     }
@@ -813,11 +1192,8 @@ export default function StoryEditor() {
             <button onClick={handleSave} title="حفظ مجمل" className="px-3 py-1.5 bg-transparent border border-[var(--border)] hover:bg-[#2a2a2a] rounded text-[var(--text)] transition-colors flex items-center justify-center">
               <Save size={16} />
             </button>
-            <button onClick={() => setShowPrintModal(true)} title="طباعة" className="px-3 py-1.5 bg-transparent border border-[var(--border)] hover:bg-[#2a2a2a] rounded text-[var(--text)] transition-colors flex items-center justify-center">
+            <button onClick={() => setShowPrintModal(true)} title="طباعة المشروع (الصفحة الحالية أو الكل)" className="px-3 py-1.5 bg-[var(--accent)] border border-[var(--accent)] hover:bg-purple-600 rounded text-white transition-colors flex items-center justify-center shadow-lg">
               <Printer size={16} />
-            </button>
-            <button onClick={() => setShowExportModal(true)} title="تصدير (Word/EPUB)" className="px-3 py-1.5 bg-[var(--accent)] border border-[var(--accent)] hover:bg-purple-600 rounded text-white transition-colors flex items-center justify-center">
-              <Download size={16} />
             </button>
           </div>
       </header>
@@ -1098,14 +1474,14 @@ export default function StoryEditor() {
         <div className="fixed inset-0 bg-black/80 z-[100] flex items-center justify-center p-4 backdrop-blur-sm" dir="rtl">
           <div className="bg-[var(--panel)] border border-[var(--border)] rounded-xl w-full max-w-sm overflow-hidden flex flex-col">
             <div className="flex justify-between items-center p-5 border-b border-[var(--border)] relative">
-              <h2 className="text-xl font-bold flex items-center gap-2"><Printer strokeWidth={2.5}/> تصدير وطباعة</h2>
+              <h2 className="text-xl font-bold flex items-center gap-2"><Printer strokeWidth={2.5}/> خيارات الطباعة</h2>
               <button onClick={() => setShowPrintModal(false)} className="text-[var(--text-dim)] hover:text-white"><X size={24}/></button>
             </div>
             <div className="p-6 flex flex-col gap-4">
-              <p className="text-sm text-[var(--text-dim)] mb-4">اختر النطاق الذي ترغب في طباعته أو حفظه كملف PDF:</p>
+              <p className="text-sm text-[var(--text-dim)] mb-4">اختر النطاق الذي ترغب في طباعته:</p>
               
               <div className="bg-blue-500/10 border border-blue-500/20 text-blue-400 p-3 rounded text-[10px] mb-4 leading-relaxed">
-                💡 لحفظ الملف بصيغة PDF بعد الضغط على أحد الخيارات، اختر "حفظ بتنسيق PDF" أو "Microsoft Print to PDF" من قائمة الطابعات في النافذة التي ستظهر.
+                💡 لحفظ الملف بصيغة PDF بعد الضغط على أحد الخيارات، اختر "حفظ بتنسيق PDF" من قائمة الطابعات في النافذة التي ستظهر.
               </div>
               
               <button 
@@ -1137,63 +1513,54 @@ export default function StoryEditor() {
       </div>
 
       {printType !== 'none' && (
-        <div className="print-only-container bg-white text-black relative flex flex-col items-center py-8" dir="rtl" style={{ minWidth: 'min-content' }}>
+        <div className="print-container-root" dir="rtl">
            <button 
              onClick={() => setPrintType('none')}
-             data-html2canvas-ignore="true"
-             className="no-print fixed top-6 right-6 bg-red-600 hover:bg-red-700 text-white px-6 py-3 rounded-full flex items-center gap-2 shadow-2xl z-[9999] font-bold text-lg"
+             className="no-print fixed top-6 right-6 bg-red-600 hover:bg-red-700 text-white px-8 py-4 rounded-full flex items-center gap-3 shadow-2xl z-[99999] font-bold text-xl transition-transform hover:scale-105 active:scale-95"
            >
-             <X className="w-6 h-6" />
-             إغلاق وضع الطباعة
+             <X className="w-7 h-7" />
+             إغلاق معاينة الطباعة
            </button>
-           {pagesToRenderForPrint.map((page, idx) => (
-             <div 
-               key={page.id} 
-               className="mx-auto mb-8 break-after-page shadow-md relative overflow-hidden bg-white"
-               style={{ 
-                 width: 
-                    project.pageFormat === 'A4' ? '210mm' : 
-                    project.pageFormat === 'A5' ? '148mm' : 
-                    project.pageFormat === 'B5' ? '176mm' : 
-                    project.pageFormat === 'Manga' ? '130mm' :
-                    project.pageFormat === 'Manhwa' ? '120mm' :
-                    project.pageFormat === 'WebNovel' ? '240mm' :
-                    project.pageFormat === 'Letter' ? '216mm' : 
-                    project.pageFormat === 'Custom' || !project.pageFormat ? `${project.pageWidth || 624}px` : '210mm',
-                 minHeight: 
-                    project.pageFormat === 'A4' ? '297mm' : 
-                    project.pageFormat === 'A5' ? '210mm' : 
-                    project.pageFormat === 'B5' ? '250mm' : 
-                    project.pageFormat === 'Manga' ? '180mm' :
-                    project.pageFormat === 'Manhwa' ? '500mm' :
-                    project.pageFormat === 'WebNovel' ? '297mm' :
-                    project.pageFormat === 'Letter' ? '279mm' : 
-                    project.pageFormat === 'Custom' || !project.pageFormat ? '100vh' : '297mm',
-                 padding: `${project.pagePadding || 20}px`,
-                 display: 'flex',
-                 flexDirection: 'column',
-                 gap: `${project.blockGap || 0}px`,
-                 boxSizing: 'border-box',
-                 backgroundColor: project.backgroundColor || 'white'
-               }}
-             >
-               {/* Background Image Layer for Print */}
-               {page.backgroundImage && (
-                 <div 
-                   className="absolute inset-0 pointer-events-none z-0"
-                   style={{
-                     backgroundImage: `url(${page.backgroundImage})`,
-                     backgroundSize: 'cover',
-                     backgroundPosition: 'center',
-                     opacity: page.backgroundOpacity ?? 1
-                   }}
-                 />
-               )}
-                {page.blocks.map(block => (
-                   <PrintDisplayBlock key={block.id} block={block} />
-                ))}
-             </div>
-           ))}
+
+           <div className="flex flex-col items-center w-full">
+            {pagesToRenderForPrint.map((page, idx) => (
+              <div 
+                key={page.id} 
+                className={cn(
+                  "mx-auto w-full relative overflow-hidden force-background",
+                  idx < pagesToRenderForPrint.length - 1 && "break-page"
+                )}
+                style={{ 
+                  padding: `${project.pagePadding || 40}px`,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: `${project.blockGap || 0}px`,
+                  boxSizing: 'border-box',
+                  backgroundColor: (project.backgroundColor || '#ffffff') + ' !important',
+                  minHeight: '297mm',
+                  WebkitPrintColorAdjust: 'exact',
+                  printColorAdjust: 'exact'
+                } as any}
+              >
+                {/* Background Image Layer for Print */}
+                {page.backgroundImage && (
+                  <div 
+                    className="absolute inset-0 pointer-events-none z-0 force-background"
+                    style={{
+                      backgroundImage: `url(${page.backgroundImage})`,
+                      backgroundSize: 'cover',
+                      backgroundPosition: 'center',
+                      opacity: page.backgroundOpacity ?? 1,
+                      WebkitPrintColorAdjust: 'exact'
+                    } as any}
+                  />
+                )}
+                 {page.blocks.map(block => (
+                    <PrintDisplayBlock key={block.id} block={block} />
+                 ))}
+              </div>
+            ))}
+           </div>
         </div>
       )}
       {/* AISettings Modal */}
@@ -1407,13 +1774,6 @@ export default function StoryEditor() {
         isOpen={showMusicPlayer} 
         onClose={() => setShowMusicPlayer(false)} 
       />
-
-      {showExportModal && (
-        <ExportModal 
-          project={project} 
-          onClose={() => setShowExportModal(false)}
-        />
-      )}
 
       {showFindReplaceModal && (
         <FindReplaceModal 

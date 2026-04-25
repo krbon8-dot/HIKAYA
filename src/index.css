@@ -34,88 +34,89 @@
   background-color: rgba(239, 68, 68, 0.1);
 }
 
-/* Print styles to hide UI when exporting to PDF and ensure full content is printed */
+/* Radical Print Engine Reset - Nuclear Option */
 @media print {
   @page {
-    size: A4 portrait;
-    margin: 0;
+    size: auto;
+    margin: 0mm;
   }
-  
-  * {
+
+  html, body {
+    margin: 0 !important;
+    padding: 0 !important;
+    height: auto !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+    overflow: visible !important;
+    column-fill: auto;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
-    color-adjust: exact !important;
+    color-scheme: light !important;
   }
 
-  html, body, #root, section, main, div.flex-1 {
-    height: auto !important;
-    min-height: auto !important;
-    overflow: visible !important;
-    display: block !important;
-    background-color: transparent !important;
-  }
-
-  body {
-    background-color: white !important;
-  }
-  
-  .no-print {
+  /* Hide everything except print views */
+  #root > *:not(.print-container-root),
+  header, aside, .no-print, button, form, .toast, [title] {
     display: none !important;
   }
-  
-  .print-only-container {
+
+  .print-container-root {
     display: block !important;
-    background-color: transparent !important;
+    width: 210mm !important;
+    margin: 0 auto !important;
+    background: transparent !important;
+    color: #000000 !important;
+    position: static !important;
+    filter: none !important;
+  }
+
+  /* Preserve Modern Layouts */
+  .flex, [class*="flex-"] {
+    display: flex !important;
   }
   
-  .break-after-page {
-    page-break-after: always;
-    break-after: page;
-  }
-  
-  .story-container {
-    box-shadow: none !important;
-    max-width: 100% !important;
-    width: 100% !important;
-    padding: 0 !important;
-    margin: 0 !important;
+  .grid, [class*="grid-"] {
+    display: grid !important;
   }
 
-  .print-area {
-    width: 100% !important;
-    max-width: 100% !important;
+  /* High Fidelity Rendering Hacks */
+  .dark-block-print, 
+  .story-block, 
+  .graphic-block-style,
+  [class*="rounded-"],
+  [class*="shadow-"] {
+    -webkit-filter: blur(0) !important;
+    filter: blur(0) !important;
+    transform: translateZ(0) !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    background-repeat: repeat !important;
+    background-size: cover !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
   }
-  
-  .page-break-inside-avoid {
-    page-break-inside: avoid;
+
+  /* Force absolute page breaks */
+  .break-page {
+    page-break-after: always !important;
+    break-after: page !important;
+    display: block !important;
+    height: 0 !important;
+    clear: both !important;
+  }
+
+  .avoid-break {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    display: block !important;
+  }
+
+  /* Character/Graphic Block Specifics */
+  .dark-block-print {
+    border: 1px solid rgba(0,0,0,0.1) !important; /* Tiny border helps browser define edge */
   }
 }
 
-/* Accessibility / Readability Mode */
-body.a11y-mode * {
-  font-weight: 700 !important;
-  letter-spacing: 0.3px !important;
-}
-
-body.a11y-mode {
-  --text-dim: #d1d5db;
-  --text: #ffffff;
-}
-
-.custom-scrollbar::-webkit-scrollbar {
-  height: 6px;
-  width: 6px;
-}
-.custom-scrollbar::-webkit-scrollbar-track {
-  background: transparent;
-}
-.custom-scrollbar::-webkit-scrollbar-thumb {
-  background: var(--border);
-  border-radius: 4px;
-}
-.custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: var(--text-dim);
-}
 /* Accessibility / Readability Mode */
 body.a11y-mode * {
   font-weight: 700 !important;
